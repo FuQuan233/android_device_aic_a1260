@@ -64,9 +64,9 @@ CDC console. The watchdog service keeps the 30-second hardware watchdog alive.
 ADB/ACM configfs integration still requires hardware verification.
 Post-fs-data configures 512 MiB of logical LZ4 zram swap. Pages consume RAM
 as needed; no swap backing file or partition is written to eMMC.
-Manual activation with Android 17 toybox has passed on hardware. A compressed
-LZ4HC EROFS loop image also mounts and passes a 270000-byte read/SHA256 check.
-The corresponding Android init actions and full system image are still untested.
+Manual activation with Android 17 toybox and activation by Android init have
+passed on hardware. A compressed LZ4HC EROFS loop image also mounts and passes
+a 270000-byte read/SHA256 check. The full system image mounts successfully.
 
 ## Hardware status
 
@@ -79,7 +79,11 @@ Touch, hardware GPU acceleration, audio and Wi-Fi remain unfinished.
 Camera and modem support are excluded because this unit has neither component.
 The opt-in external ramdisk FDT handover has been hardware-tested with a
 marker present only in the external archive. Android 17 static Bionic/toybox
-also runs on hardware. Android PID 1 and the framework remain untested.
+also runs on hardware. Android first- and second-stage init run on hardware;
+system/vendor and data/cache mount successfully. Framework/UI startup and ADB
+remain under bring-up. APEX dm-verity requires registered Crypto API SHA256
+support even when board-level AVB is disabled; the kernel profile now includes
+SHA256/SHA512 and the boot validator checks both.
 
 Software KeyMint and Gatekeeper are included for early userspace bring-up.
 TEE-backed credential storage and production security policy remain unfinished.
