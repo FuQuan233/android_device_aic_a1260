@@ -1,0 +1,33 @@
+import /vendor/etc/init/hw/init.mt6580.usb.rc
+
+on init
+    start vendor.a1260-watchdog
+
+on fs
+    mount_all /vendor/etc/fstab.mt6580 --early
+
+on post-fs-data
+    swapon_all /vendor/etc/fstab.mt6580
+    exec_start vendor.a1260-usb-setup
+    start vendor.a1260-cdc-console
+
+service vendor.a1260-watchdog /system/bin/watchdogd 5 25
+    class core
+    user root
+    group root
+    seclabel u:r:watchdogd:s0
+
+service vendor.a1260-usb-setup /vendor/bin/a1260-usb-setup
+    disabled
+    oneshot
+    user root
+    group root shell
+    seclabel u:r:vendor_init:s0
+
+service vendor.a1260-cdc-console /system/bin/sh
+    class core
+    console ttyGS0
+    disabled
+    user root
+    group root shell log readproc
+    seclabel u:r:shell:s0

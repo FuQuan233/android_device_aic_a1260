@@ -1,0 +1,4 @@
+/vendor/bin/a1260-usb-setup    u:object_r:vendor_shell_exec:s0
+/vendor/bin/hw/android\.hardware\.composer\.hwc3-service\.drm    u:object_r:hal_graphics_composer_default_exec:s0
+/vendor/bin/hw/android\.hardware\.graphics\.allocator-service\.minigbm    u:object_r:hal_graphics_allocator_default_exec:s0
+/vendor/bin/hw/android\.hardware\.security\.keymint-service\.nonsecure    u:object_r:hal_keymint_default_exec:s0

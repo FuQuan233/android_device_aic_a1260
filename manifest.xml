@@ -1,0 +1,3 @@
+<manifest version="1.0" type="device" target-level="202604">
+    <!-- Source-built HAL modules contribute their own VINTF fragments. -->
+</manifest>

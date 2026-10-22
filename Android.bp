@@ -1,0 +1,9 @@
+soong_namespace {}
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+sh_binary {
+    name: "a1260-usb-setup",
+    src: "rootdir/a1260-usb-setup.sh",
+    vendor: true,
+}
