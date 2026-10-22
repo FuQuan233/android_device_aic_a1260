@@ -7,3 +7,12 @@ sh_binary {
     src: "rootdir/a1260-usb-setup.sh",
     vendor: true,
 }
+
+cc_binary {
+    name: "a1260-gpu-info",
+    vendor: true,
+    srcs: ["tools/gpu_info.c"],
+    header_libs: ["gl_headers"],
+    shared_libs: ["libEGL_mesa", "libGLESv2_mesa"],
+    cflags: ["-Wall", "-Werror"],
+}

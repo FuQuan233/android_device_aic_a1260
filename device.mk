@@ -26,6 +26,11 @@ PRODUCT_PACKAGES += \
     android.hardware.composer.hwc3-service.drm \
     android.hardware.graphics.allocator-service.minigbm \
     mapper.minigbm \
+    gralloc.minigbm \
+    libEGL_mesa \
+    libGLESv1_CM_mesa \
+    libGLESv2_mesa \
+    a1260-gpu-info \
     vulkan.pastel \
     libEGL_angle \
     libGLESv1_CM_angle \
@@ -52,11 +57,11 @@ PRODUCT_COPY_FILES += \
 PRODUCT_VENDOR_PROPERTIES += \
     ro.sf.lcd_density=240 \
     ro.hardware.gralloc=minigbm \
-    ro.hardware.egl=angle \
+    ro.hardware.egl=mesa \
     ro.hardware.vulkan=pastel \
-    vendor.hwc.drm.device=/dev/dri/card0 \
+    vendor.hwc.drm.device=/dev/dri/card% \
     ro.vendor.hwc.use_overlay_planes=false \
-    ro.opengles.version=196609 \
+    ro.opengles.version=131072 \
     persist.sys.usb.config=adb
 PRODUCT_SYSTEM_PROPERTIES += \
     ro.radio.noril=true \

@@ -2,6 +2,9 @@ import /vendor/etc/init/hw/init.mt6580.usb.rc
 
 on init
     start vendor.a1260-watchdog
+    # Wake IRQs are not ported yet; s2idle currently loses USB permanently.
+    # TODO: Remove this temporary lock after suspend/resume works (see TODO.md).
+    write /sys/power/wake_lock a1260-bringup
     # Apply Android's normal overcommit policy before ART reserves its heap.
     write /proc/sys/vm/overcommit_memory 1
 

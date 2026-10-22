@@ -185,3 +185,41 @@ the primary node and implicitly becomes master. Apply
 `patches/minigbm-release-allocator-drm-master.patch` from `external/minigbm`
 to release that ownership after allocator initialization, matching minigbm's
 existing GBM discovery behavior. Physical Android scanout remains unverified.
+
+That allocator fix is now verified: HWC holds DRM master, attaches DSI-1,
+and the user sees the LineageOS boot animation on the actual LCD. RDMA reports
+no underflows. CC also reaches `sys.boot_completed=1`, but Launcher/SystemUI
+still crash when the 16 MiB CMA pool is exhausted; this does not yet qualify
+as a working desktop. The kernel increases the reusable display CMA pool to
+64 MiB for the next hardware boot.
+
+## Lima GPU bring-up
+
+The kernel now describes the Mali-400 at 0x13010000, its six interrupts, MFG
+power domain and clock gates using the MT6580 vendor platform/clock/power
+sources as reference. The top clock mux and supply voltages remain as firmware
+left them; DVFS is not enabled. The first Lima kernel and ARMv7 Mesa libraries
+compile, but actual GPU identification, completed jobs and Android rendering
+still need hardware verification. The vendor product selects Mesa EGL/GLES2
+and retains SwiftShader Vulkan/ANGLE libraries for bring-up fallback. Mali-400
+does not provide Vulkan or GLES3; the advertised GLES version is 2.0.
+
+Mesa prebuilts are rebuilt from this workspace's `external/mesa3d` with:
+
+    PYTHONPATH=/path/to/python-tools python3 device/aic/a1260/tools/build_lima_mesa.py \
+        --toolchain /path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64 \
+        --out /path/to/mesa-lima -j 8
+
+The Python tools directory needs meson >= 1.4, mako, packaging and PyYAML.
+The build uses this product's vendor libdrm; Android stub libraries are only
+link-time interfaces and are never installed. Meson installation removes
+build RPATHs before copying the real EGL/GLES/Gallium libraries into the device
+prebuilts directory. The accompanying NDK libc++_shared is separate from the
+platform libc++. `a1260-gpu-info` reports the EGL/GL renderer and submits an
+offscreen triangle with readback, allowing GPU completion to be checked even
+if the Android window stack fails.
+
+The current system can enter s2idle and fail to wake. A temporary kernel
+wake lock keeps bring-up sessions usable. The user's explicit removal request,
+the exact command and the resume verification conditions are recorded in
+`TODO.md`; the lock must be removed once the wake path is repaired.

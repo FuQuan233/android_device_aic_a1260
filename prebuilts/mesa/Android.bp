@@ -1,0 +1,65 @@
+package {
+    default_applicable_licenses: ["a1260_mesa_license"],
+}
+
+license {
+    name: "a1260_mesa_license",
+    license_kinds: [
+        "SPDX-license-identifier-MIT",
+        "SPDX-license-identifier-Apache-2.0",
+        "SPDX-license-identifier-GPL-1.0-or-later",
+        "SPDX-license-identifier-GPL-2.0-only",
+    ],
+    license_text: ["LICENSE.mesa"],
+}
+
+cc_defaults {
+    name: "a1260_mesa_prebuilt_defaults",
+    vendor: true,
+    compile_multilib: "32",
+    stl: "none",
+    strip: { none: true },
+}
+
+cc_prebuilt_library_shared {
+    name: "a1260_libcxx_ndk",
+    defaults: ["a1260_mesa_prebuilt_defaults"],
+    stem: "libc++_shared",
+    srcs: ["arm/libc++_shared.so"],
+    shared_libs: ["libdl"],
+}
+
+cc_prebuilt_library_shared {
+    name: "a1260_libgallium_dri",
+    defaults: ["a1260_mesa_prebuilt_defaults"],
+    stem: "libgallium_dri",
+    srcs: ["arm/libgallium_dri.so"],
+    shared_libs: ["a1260_libcxx_ndk", "libcutils", "liblog", "libsync", "libdrm", "libdl"],
+}
+
+cc_prebuilt_library_shared {
+    name: "libEGL_mesa",
+    defaults: ["a1260_mesa_prebuilt_defaults"],
+    relative_install_path: "egl",
+    srcs: ["arm/libEGL_mesa.so"],
+    shared_libs: [
+        "a1260_libgallium_dri", "libcutils", "libhardware", "liblog",
+        "libnativewindow", "libsync", "libdrm", "libdl",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libGLESv1_CM_mesa",
+    defaults: ["a1260_mesa_prebuilt_defaults"],
+    relative_install_path: "egl",
+    srcs: ["arm/libGLESv1_CM_mesa.so"],
+    shared_libs: ["a1260_libgallium_dri"],
+}
+
+cc_prebuilt_library_shared {
+    name: "libGLESv2_mesa",
+    defaults: ["a1260_mesa_prebuilt_defaults"],
+    relative_install_path: "egl",
+    srcs: ["arm/libGLESv2_mesa.so"],
+    shared_libs: ["a1260_libgallium_dri"],
+}
