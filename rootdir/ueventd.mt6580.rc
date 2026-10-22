@@ -1,5 +1,5 @@
 /dev/dri/card*             0660 system graphics
-/dev/dri/renderD*          0660 system graphics
+/dev/dri/renderD*          0666 system graphics
 /dev/dma_heap/system       0660 system graphics
 /dev/watchdog              0600 root root
 /dev/watchdog0             0600 root root

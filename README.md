@@ -68,7 +68,7 @@ experimental port, not a claim of launch-device/VTS compliance.
 The kernel profile keeps CPU0 only until secondary-core release is implemented.
 SELinux is permissive during bring-up. Debug builds allow root ADB; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
 The Android image exposes only FunctionFS/ADB, without ACM or ttyGS0.
-ADB configfs integration still requires hardware verification.
+USB ADB enumeration and root shell are verified; large bulk transfers remain unreliable.
 The fs action configures 512 MiB of logical LZ4 zram swap before ART starts.
 Android's ordinary overcommit policy is applied in init for the same reason. Pages consume RAM
 as needed; no swap backing file or partition is written to eMMC.
@@ -78,12 +78,11 @@ a 270000-byte read/SHA256 check. The full system image mounts successfully.
 
 ## Hardware status
 
-The kernel has tested USB CDC, eMMC and 480x800 JD9161 DRM scanout. The initial
-Android graphics stack uses drm_hwcomposer, generic minigbm dumb buffers, ANGLE
-and SwiftShader. These Android HALs have not yet been tested on this board.
+The kernel has tested USB CDC, eMMC and 480x800 JD9161 DRM scanout. The Android graphics stack uses drm_hwcomposer, minigbm KMS buffers and
+Mesa Lima GLES2. Physical boot animation and GPU rendering are verified.
 Reference health/power services are used until PMIC/battery and CPU power
 management drivers are ready. No legacy vendor binary HAL is assumed compatible.
-Touch, hardware GPU acceleration, audio and Wi-Fi remain unfinished.
+Touch, hardware audio and Wi-Fi remain unfinished.
 Camera and modem support are excluded because this unit has neither component.
 The opt-in external ramdisk FDT handover has been hardware-tested with a
 marker present only in the external archive. Android 17 static Bionic/toybox
@@ -108,8 +107,7 @@ on hardware without that restart loop. A source audit found missing raw tables, 
 REJECT, TCPMSS, policy routing and XFRM support in the kernel profile; these
 are enabled and checked by the boot validator. Early zram activation is hardware-tested
 and the prior ART allocation failure is no longer present in UART output.
-The metadata partition is not mounted yet; aconfig reports read-only metadata
-storage and remains a separate follow-up issue.
+Metadata is now initialized and mounted; aconfig initialization passes.
 
 Software KeyMint and Gatekeeper are included for early userspace bring-up.
 TEE-backed credential storage and production security policy remain unfinished.
@@ -124,7 +122,7 @@ FunctionFS readiness markers are written to the UART. The expanded netd configur
 shows adbd starting only its TCP/vsock backend: init's inherited umask 077
 left /dev/usb-ffs inaccessible to shell after adbd dropped privileges. Setup
 now explicitly assigns shell ownership and mode 0770 to both parent and mount
-directories; USB enumeration needs another hardware boot to confirm.
+directories; hardware now enumerates ADB and provides a working shell.
 
 The same log shows audioserver repeatedly dereferencing a missing audio HAL.
 The reference AIDL audio APEX, effects and policy XML are now included. Primary
@@ -139,7 +137,7 @@ software audio services, not physical microphone or speaker operation.
 
 USB ADB shell, reconnect and UID 0 shell are verified on hardware. The reference
 AIDL core/effect audio services register and audioserver remains running.
-System server starts, but completion is still under investigation.
+System server reaches boot_completed; desktop rendering remains under investigation.
 
 ART's shipped boot image uses CMC while a kernel without USERFAULTFD makes the
 runtime fall back to CC/read barriers. The kernel Android profile now enables
@@ -173,36 +171,53 @@ The product now explicitly uses PRODUCT_ENABLE_UFFD_GC=false, the supported
 non-GKI ART CC configuration. Boot images and all dexpreopt outputs must be
 rebuilt with the runtime property, rather than mixing CMC images and CC.
 This changes GC configuration only; the full non-Go product remains enabled.
-Hardware completion is still pending.
+The matching CC system is flashed and passes the earlier panic point; a working
+desktop remains the completion criterion.
 
-Android has not displayed a boot animation on the physical LCD. An active
-bootanimation process is not evidence of scanout. HWC logs show
+Before the allocator ownership fix, Android did not display a boot animation
+on the physical LCD. HWC logs showed
 `DRM/KMS master access required`, followed by a headless null display; DRM
 state also shows the CRTC disabled and no framebuffer. The DRM clients table
 shows the graphics allocator holding master rather than the compositor.
 This display-only driver has no render node, so cros_gralloc falls back to
 the primary node and implicitly becomes master. Apply
-`patches/minigbm-release-allocator-drm-master.patch` from `external/minigbm`
+`patches/minigbm-mt6580-display-and-lima.patch` from `external/minigbm`
 to release that ownership after allocator initialization, matching minigbm's
-existing GBM discovery behavior. Physical Android scanout remains unverified.
+existing GBM discovery behavior.
 
 That allocator fix is now verified: HWC holds DRM master, attaches DSI-1,
 and the user sees the LineageOS boot animation on the actual LCD. RDMA reports
 no underflows. CC also reaches `sys.boot_completed=1`, but Launcher/SystemUI
 still crash when the 16 MiB CMA pool is exhausted; this does not yet qualify
 as a working desktop. The kernel increases the reusable display CMA pool to
-64 MiB for the next hardware boot.
+64 MiB; the new pool is active on hardware.
 
 ## Lima GPU bring-up
 
 The kernel now describes the Mali-400 at 0x13010000, its six interrupts, MFG
 power domain and clock gates using the MT6580 vendor platform/clock/power
 sources as reference. The top clock mux and supply voltages remain as firmware
-left them; DVFS is not enabled. The first Lima kernel and ARMv7 Mesa libraries
-compile, but actual GPU identification, completed jobs and Android rendering
-still need hardware verification. The vendor product selects Mesa EGL/GLES2
+left them; DVFS is not enabled. Hardware identifies Mali-400 MP2 at the firmware
+500.5 MHz setting. An offscreen triangle completes with the expected green
+pixel and no GL error; SurfaceFlinger reports Mesa/Mali400, and the user
+confirms normal, much smoother animation. Application buffer import now also
+passes: the user sees the desktop, and Settings renders its text and icons.
+Launcher and SystemUI remain alive after startup. The vendor product selects Mesa EGL/GLES2
 and retains SwiftShader Vulkan/ANGLE libraries for bring-up fallback. Mali-400
 does not provide Vulkan or GLES3; the advertised GLES version is 2.0.
+
+The minigbm patch above adds an import-only Lima backend using PRIME and the
+Lima GEM mmap interface. Mapper/legacy metadata queries use the render node;
+AIDL/Gralloc4 allocation skips import-only backends and retains KMS allocation
+for contiguous scanout. Applications can open render nodes (0666), while
+primary card nodes remain limited to system/graphics (0660). Five matching
+vendor minigbm modules were deployed atomically through root ADB, followed by
+a hardware reboot. The vendor image includes the same fix.
+
+Cold startup still triggers SystemUI ANRs on the current single-core profile;
+after startup it stays alive and renders. Bluetooth separately aborts because
+real-time scheduling is unavailable. Neither issue is treated as a GPU fix.
+SELinux remains permissive, touch and physical audio/Wi-Fi are still pending.
 
 Mesa prebuilts are rebuilt from this workspace's `external/mesa3d` with:
 
