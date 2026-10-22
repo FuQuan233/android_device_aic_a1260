@@ -154,3 +154,9 @@ The 41287680-byte previously unformatted metadata partition was backed up to
 /home/fuquan/AIC/out/wt6580-reference/metadata-before-android17.img and initialized
 as ext4 explicitly during bring-up; the fstab does not format it or userdata.
 UART logcat forwarding stops when USB ADB is available to reduce CPU load.
+
+NetworkStatsService also needs CONFIG_NET_KEY: BpfNetMaps synchronizes RCU by
+opening/closing a PF_KEY socket. Without it, errno 97 propagates as a fatal
+system_server exception. The Android kernel profile now includes PF_KEY.
+Hardware also confirmed the 16 MiB heap eventually causes system_server OOM,
+so the 1 GiB heap profile is required rather than just a startup optimization.
