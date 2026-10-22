@@ -17,6 +17,8 @@ PRODUCT_SOONG_NAMESPACES += $(LOCAL_PATH)
 # Rebuild vendor interfaces from this source tree; legacy binary HALs are not
 # yet compatible with the mainline-style 6.18 hardware drivers.
 $(call soong_config_set,minigbm,platform,generic)
+# Only this debug port opts into native ARM32 networking on Linux 6.18.
+$(call soong_config_set,aic_a1260,mt6580_arm32_kernel,true)
 PRODUCT_PACKAGES += \
     android.hardware.composer.hwc3-service.drm \
     android.hardware.graphics.allocator-service.minigbm \

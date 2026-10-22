@@ -1,0 +1,101 @@
+diff --git a/bpf/loader/Android.bp b/bpf/loader/Android.bp
+index bee2681..98ba428 100644
+--- a/bpf/loader/Android.bp
++++ b/bpf/loader/Android.bp
+@@ -44,10 +44,29 @@ install_symlink {
+     },
+ }
+ 
++// Opt-in for the A1260's native ARM32 kernel bring-up. Other products retain
++// the upstream architecture requirements.
++soong_config_module_type {
++    name: "a1260_netbpfload_cc_defaults",
++    module_type: "cc_defaults",
++    config_namespace: "aic_a1260",
++    bool_variables: ["mt6580_arm32_kernel"],
++    properties: ["cflags"],
++}
++
++a1260_netbpfload_cc_defaults {
++    name: "a1260_netbpfload_defaults",
++    soong_config_variables: {
++        mt6580_arm32_kernel: {
++            cflags: ["-DAIC_MT6580_ARM32_BRINGUP"],
++        },
++    },
++}
++
+ cc_binary {
+     name: "netbpfload",
+ 
+-    defaults: ["bpf_cc_defaults"],
++    defaults: ["bpf_cc_defaults", "a1260_netbpfload_defaults"],
+     cflags: [
+         "-Wformat",
+         "-Wformat-signedness",
+diff --git a/bpf/loader/NetBpfLoad.cpp b/bpf/loader/NetBpfLoad.cpp
+index 7ba3247..0cae475 100644
+--- a/bpf/loader/NetBpfLoad.cpp
++++ b/bpf/loader/NetBpfLoad.cpp
+@@ -1516,6 +1516,21 @@ static int doLoad(char** argv, char * const envp[]) {
+ 
+     const int first_api_level = GetIntProperty("ro.board.first_api_level", api_level_full / 100);
+ 
++    // This board runs native ARM32 userspace on an ARM32 6.18 kernel. It does
++    // not use the 32-on-64 compat interfaces discussed below. Allow the actual
++    // BPF syscalls, map operations and verifier checks to diagnose this port;
++    // keep every functional failure fatal. This is not a VTS compliance claim.
++    bool nativeArm32Bringup = false;
++#ifdef AIC_MT6580_ARM32_BRINGUP
++    nativeArm32Bringup = (isUserdebug || isEng) && isArm() && isKernel32Bit() &&
++                        isUserspace32bit() && isKernelVersion(6, 18) &&
++                        GetProperty("ro.hardware", "") == "mt6580";
++#endif
++    if (nativeArm32Bringup) {
++        ALOGW("[MT6580 bring-up] Testing native ARM32 on Linux 6.18; "
++              "architecture policy exemptions enabled, BPF validation retained.");
++    }
++
+     // last in U QPR2 beta1
+     const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
+     // first in U QPR2 beta~2
+@@ -1590,18 +1605,18 @@ static int doLoad(char** argv, char * const envp[]) {
+     // see also: //system/netd/tests/kernel_test.cpp TestKernel64Bit
+     if (isAtLeastV && isKernel32Bit() && isAtLeastKernelVersion(5, 16)) {
+         ALOGE("Android V+ platform with 32 bit kernel version >= 5.16.0 is unsupported");
+-        if (!isTV()) return 8;
++        if (!isTV() && !nativeArm32Bringup) return 8;
+     }
+ 
+     if (isKernel32Bit() && isAtLeast25Q2) {
+         ALOGE("Android 25Q2 requires 64 bit kernel.");
+-        return 9;
++        if (!nativeArm32Bringup) return 9;
+     }
+ 
+     // 6.6 is highest version supported by Android V, so this is effectively W+ (sdk=36+)
+     if (isKernel32Bit() && isAtLeastKernelVersion(6, 7)) {
+         ALOGE("Android platform with 32 bit kernel version >= 6.7.0 is unsupported");
+-        return 10;
++        if (!nativeArm32Bringup) return 10;
+     }
+ 
+     // Various known ABI layout issues, particularly wrt. bpf and ipsec/xfrm.
+@@ -1670,7 +1685,7 @@ static int doLoad(char** argv, char * const envp[]) {
+         if (isArm() && (isTV() || isWear())) {
+             // exempt Arm TV or Wear devices (arm32 ABI is far less problematic than x86-32)
+             ALOGW("[Arm TV/Wear] 32-bit userspace unsupported on 6.2+ kernels.");
+-        } else if (first_api_level <= 33 /*T*/ && isArm()) {
++        } else if (nativeArm32Bringup || (first_api_level <= 33 /*T*/ && isArm())) {
+             // also exempt Arm devices upgrading with major kernel rev from T-
+             // might possibly be better for them to run with a newer kernel...
+             ALOGW("[Arm KernelUpRev] 32-bit userspace unsupported on 6.2+ kernels.");
+@@ -1693,7 +1708,7 @@ static int doLoad(char** argv, char * const envp[]) {
+     if (isUserspace32bit() && isAtLeastKernelVersion(6, 13)) {
+         // due to previous check only reachable on Arm && (<=T kernel uprev || TV || Wear)
+         ALOGE("64-bit userspace required on 6.13+ kernels.");
+-        return 14;
++        if (!nativeArm32Bringup) return 14;
+     }
+ 
+     if (isAtLeast25Q2) {

@@ -2,12 +2,16 @@ import /vendor/etc/init/hw/init.mt6580.usb.rc
 
 on init
     start vendor.a1260-watchdog
+    # Apply Android's normal overcommit policy before ART reserves its heap.
+    write /proc/sys/vm/overcommit_memory 1
 
 on fs
     mount_all /vendor/etc/fstab.mt6580 --early
+    # ART runs inside the platform post-fs-data action, before the vendor one.
+    # Make swap available before dex2oat reserves its initial heap.
+    swapon_all /vendor/etc/fstab.mt6580
 
 on post-fs-data
-    swapon_all /vendor/etc/fstab.mt6580
     exec_start vendor.a1260-usb-setup
     start vendor.a1260-cdc-console
 

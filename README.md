@@ -18,11 +18,18 @@ Place FuQuan233/android_kernel_aic_a1260, branch kernel-6.18, at
 `kernel/aic/mt6580`. In the existing workspace that path is a local symlink to
 `~/AIC/kernel7`. Android Clang r547379 is selected for the kernel.
 
-Two local build-system fixes are saved under `patches/`. On a fresh checkout,
+Local source fixes are saved under `patches/`. On a fresh checkout,
 apply `lineage-kernel-module-detection.patch` from `vendor/lineage` and
 `soong-memory-tuning.patch` from `build/soong` with `git apply`. The first
 prevents `hardware=mt6580` in CONFIG_CMDLINE from being mistaken for a module.
 The second forwards Go memory tuning into Soong's isolated environment.
+Apply `mt6580-native-arm32-netbpfload.patch` from
+`packages/modules/Connectivity` for this native ARM32 port. The device opts in
+through `aic_a1260.mt6580_arm32_kernel`; runtime exemptions apply only to
+mt6580, ARM32 kernel/userspace, Linux 6.18 and userdebug/eng builds. Upstream
+architecture policy exits are relaxed, while real BPF syscall, program/map
+loading and verifier failures remain fatal. Network functionality and ABI
+compatibility still require hardware testing; this is not VTS compliance.
 
     export OUT_DIR=out SOONG_NINJA=ninja GOGC=25 GOMEMLIMIT=22GiB
     source build/envsetup.sh
@@ -62,7 +69,8 @@ The kernel profile keeps CPU0 only until secondary-core release is implemented.
 SELinux is permissive during bring-up. Debug builds allow root ADB and a root
 CDC console. The watchdog service keeps the 30-second hardware watchdog alive.
 ADB/ACM configfs integration still requires hardware verification.
-Post-fs-data configures 512 MiB of logical LZ4 zram swap. Pages consume RAM
+The fs action configures 512 MiB of logical LZ4 zram swap before ART starts.
+Android's ordinary overcommit policy is applied in init for the same reason. Pages consume RAM
 as needed; no swap backing file or partition is written to eMMC.
 Manual activation with Android 17 toybox and activation by Android init have
 passed on hardware. A compressed LZ4HC EROFS loop image also mounts and passes
@@ -83,7 +91,11 @@ also runs on hardware. Android first- and second-stage init run on hardware;
 system/vendor and data/cache mount successfully. Framework/UI startup and ADB
 remain under bring-up. APEX dm-verity requires registered Crypto API SHA256
 support even when board-level AVB is disabled; the kernel profile now includes
-SHA256/SHA512 and the boot validator checks both.
+SHA256/SHA512 and the boot validator checks both. Hardware now activates all
+40 APEX packages; the next observed blocker is netbpfload's ARM32 architecture
+policy exit (status 8). The opt-in patch above allows functional BPF testing.
+The metadata partition is not mounted yet; aconfig reports read-only metadata
+storage and remains a separate follow-up issue.
 
 Software KeyMint and Gatekeeper are included for early userspace bring-up.
 TEE-backed credential storage and production security policy remain unfinished.
