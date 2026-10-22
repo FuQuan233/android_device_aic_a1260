@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This A1260 has no camera or cellular baseband. -->
+<permissions>
+    <unavailable-feature name="android.hardware.camera" />
+    <unavailable-feature name="android.hardware.camera.any" />
+    <unavailable-feature name="android.hardware.camera.ar" />
+    <unavailable-feature name="android.hardware.camera.autofocus" />
+    <unavailable-feature name="android.hardware.camera.capability.manual_post_processing" />
+    <unavailable-feature name="android.hardware.camera.capability.manual_sensor" />
+    <unavailable-feature name="android.hardware.camera.capability.raw" />
+    <unavailable-feature name="android.hardware.camera.concurrent" />
+    <unavailable-feature name="android.hardware.camera.external" />
+    <unavailable-feature name="android.hardware.camera.flash" />
+    <unavailable-feature name="android.hardware.camera.front" />
+    <unavailable-feature name="android.hardware.camera.level.full" />
+    <unavailable-feature name="android.hardware.telephony" />
+    <unavailable-feature name="android.hardware.telephony.calling" />
+    <unavailable-feature name="android.hardware.telephony.carrierlock" />
+    <unavailable-feature name="android.hardware.telephony.cdma" />
+    <unavailable-feature name="android.hardware.telephony.data" />
+    <unavailable-feature name="android.hardware.telephony.euicc" />
+    <unavailable-feature name="android.hardware.telephony.euicc.mep" />
+    <unavailable-feature name="android.hardware.telephony.gsm" />
+    <unavailable-feature name="android.hardware.telephony.ims" />
+    <unavailable-feature name="android.hardware.telephony.ims.singlereg" />
+    <unavailable-feature name="android.hardware.telephony.mbms" />
+    <unavailable-feature name="android.hardware.telephony.messaging" />
+    <unavailable-feature name="android.hardware.telephony.radio.access" />
+    <unavailable-feature name="android.hardware.telephony.satellite" />
+    <unavailable-feature name="android.hardware.telephony.subscription" />
+</permissions>

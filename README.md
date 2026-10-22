@@ -2,6 +2,11 @@
 
 This is a device product (`lineage_a1260`), with its own boot and vendor images.
 It does not inherit a GSI, emulator BoardConfig, dynamic partitions or generic vendor.
+The product uses full Lineage mobile configuration and the regular launcher,
+with no Android Go/low-RAM defaults. This unit has no cellular baseband or
+camera: it inherits AOSP's no-telephony base and Lineage's Wi-Fi-only overlay,
+sets `ro.radio.noril=true`, and excludes Aperture with `PRODUCT_NO_CAMERA=true`.
+Hardware feature overrides remove camera and cellular capability declarations.
 
 `mt6580` identifies the SoC platform and Android hardware (`ro.hardware`),
 including `init.mt6580.rc` and `fstab.mt6580`. `wt6580_we_n` identifies the
@@ -64,7 +69,8 @@ Android graphics stack uses drm_hwcomposer, generic minigbm dumb buffers, ANGLE
 and SwiftShader. These Android HALs have not yet been tested on this board.
 Reference health/power services are used until PMIC/battery and CPU power
 management drivers are ready. No legacy vendor binary HAL is assumed compatible.
-Touch, hardware GPU acceleration, audio, Wi-Fi, camera and modem remain unfinished.
+Touch, hardware GPU acceleration, audio and Wi-Fi remain unfinished.
+Camera and modem support are excluded because this unit has neither component.
 The opt-in external ramdisk FDT handover has been hardware-tested with a
 marker present only in the external archive. Android 17 static Bionic/toybox
 also runs on hardware. Android PID 1 and the framework remain untested.

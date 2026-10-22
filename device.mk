@@ -35,6 +35,8 @@ PRODUCT_PACKAGES += \
     a1260-usb-setup
 
 PRODUCT_COPY_FILES += \
+    frameworks/native/data/etc/handheld_core_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/handheld_core_hardware.xml \
+    $(LOCAL_PATH)/permissions/a1260-absent-hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/a1260-absent-hardware.xml \
     $(LOCAL_PATH)/rootdir/fstab.mt6580:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.mt6580 \
     $(LOCAL_PATH)/rootdir/fstab.mt6580:$(TARGET_COPY_OUT_RAMDISK)/fstab.mt6580 \
     $(LOCAL_PATH)/rootdir/init.mt6580.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.mt6580.rc \
@@ -51,6 +53,7 @@ PRODUCT_VENDOR_PROPERTIES += \
     ro.opengles.version=196609 \
     persist.sys.usb.config=adb
 PRODUCT_SYSTEM_PROPERTIES += \
+    ro.radio.noril=true \
     ro.zygote=zygote32 \
     debug.renderengine.backend=skiaglthreaded
 PRODUCT_SYSTEM_EXT_PROPERTIES += service.sf.prime_shader_cache=0
