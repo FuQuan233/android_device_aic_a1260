@@ -75,7 +75,9 @@ def validate(boot, source):
     for setting in ('CONFIG_ARM_APPENDED_DTB_INITRD_FROM_BOOTLOADER=y',
                     'CONFIG_INITRAMFS_SOURCE=""', 'CONFIG_USB_CONFIGFS_F_FS=y',
                     'CONFIG_USB_CONFIGFS_ACM=y', '# CONFIG_USB_G_SERIAL is not set',
-                    'CONFIG_VFP=y', 'CONFIG_NEON=y', 'CONFIG_SECURITY_SELINUX=y'):
+                    'CONFIG_VFP=y', 'CONFIG_NEON=y', 'CONFIG_SECURITY_SELINUX=y',
+                    'CONFIG_DM_VERITY=y', 'CONFIG_CRYPTO_SHA256=y',
+                    'CONFIG_CRYPTO_SHA512=y'):
         require(setting in selected, 'Missing built kernel setting: ' + setting)
     return {'product': 'lineage_a1260', 'boot_bytes': len(image),
             'boot_sha256': hashlib.sha256(image).hexdigest(), 'header_version': version,

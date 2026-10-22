@@ -22,6 +22,7 @@ BOARD_KERNEL_CMDLINE := earlycon console=ttyS0,921600n8 console=ttyGS0
 BOARD_KERNEL_CMDLINE += androidboot.hardware=mt6580 androidboot.boot_devices=11120000.mmc
 BOARD_KERNEL_CMDLINE += maxcpus=1 clk_ignore_unused pd_ignore_unused panic=15
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive enforcing=0
+BOARD_KERNEL_CMDLINE += printk.devkmsg=on
 BOARD_RAMDISK_USE_LZ4 := false
 
 TARGET_KERNEL_SOURCE := kernel/aic/mt6580
