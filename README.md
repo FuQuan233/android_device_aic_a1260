@@ -82,7 +82,7 @@ The kernel has tested USB CDC, eMMC and 480x800 JD9161 DRM scanout. The Android 
 Mesa Lima GLES2. Physical boot animation and GPU rendering are verified.
 Reference health/power services are used until PMIC/battery and CPU power
 management drivers are ready. No legacy vendor binary HAL is assumed compatible.
-Touch, hardware audio and Wi-Fi remain unfinished.
+Touch is verified; hardware audio and Wi-Fi remain unfinished.
 Camera and modem support are excluded because this unit has neither component.
 The opt-in external ramdisk FDT handover has been hardware-tested with a
 marker present only in the external archive. Android 17 static Bionic/toybox
@@ -217,7 +217,7 @@ a hardware reboot. The vendor image includes the same fix.
 Cold startup still triggers SystemUI ANRs on the current single-core profile;
 after startup it stays alive and renders. Bluetooth separately aborts because
 real-time scheduling is unavailable. Neither issue is treated as a GPU fix.
-SELinux remains permissive, touch and physical audio/Wi-Fi are still pending.
+SELinux remains permissive; physical audio/Wi-Fi are still pending.
 
 Mesa prebuilts are rebuilt from this workspace's `external/mesa3d` with:
 
@@ -238,3 +238,26 @@ The current system can enter s2idle and fail to wake. A temporary kernel
 wake lock keeps bring-up sessions usable. The user's explicit removal request,
 the exact command and the resume verification conditions are recorded in
 `TODO.md`; the lock must be removed once the wake path is repaired.
+
+
+## FT6336U touch
+
+The reference BSP touch implementation and board parameters were confirmed
+correct by the device owner. The kernel profile now enables the MT6580 Paris
+pinctrl/EINT support, I2C1 with manual WRRD combination, MT6350 VGP1 regulation
+and the existing EDT/FocalTech driver for FT6336U. VGP1 is enabled at 2.8 V;
+reset is GPIO2, interrupt GPIO5/EINT5, and I2C1 uses address 0x38 with
+GPIO59/SCL and GPIO62/SDA. No touch firmware is flashed.
+
+On hardware, /dev/input/event0 reports INPUT_PROP_DIRECT, X=0..479, Y=0..799
+and two contacts. Android InputReader identifies an internal TOUCH/TOUCH_MT
+device. The input name EP0110M09 comes from upstream's firmware vendor-ID
+heuristic; it is not an independent EDT panel identification. Real taps,
+drags and releases generate interrupts and complete input events. The user
+confirms accurate tapping, swiping and two-finger operation. This repair only
+requires the rebuilt boot image; the existing Android input stack handles it.
+
+A transient physical display misalignment was reported during this boot and
+recovered without changes. The captured screenshot is normal, with zero
+RDMA underflows and abnormal events; the cause remains unconfirmed.
+The temporary suspend-prevention wake lock remains as tracked in TODO.md.
