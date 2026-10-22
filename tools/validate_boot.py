@@ -53,9 +53,9 @@ def validate(boot, source):
     fstab = archive_file(archive, 'fstab.mt6580').decode()
     entries = {p[1]: p for line in fstab.splitlines()
                if (p := line.split()) and not p[0].startswith('#')}
-    require(entries['/system'][0:3] == ['/dev/block/mmcblk0p19', '/system', 'erofs'],
+    require(entries['/system'][0:3] == ['/dev/block/by-name/system', '/system', 'erofs'],
             'Wrong system partition or filesystem in first-stage fstab')
-    require(entries['/vendor'][0:3] == ['/dev/block/mmcblk0p12', '/vendor', 'ext4'],
+    require(entries['/vendor'][0:3] == ['/dev/block/by-name/vendor', '/vendor', 'ext4'],
             'Wrong vendor partition or filesystem in first-stage fstab')
     with tempfile.TemporaryDirectory(prefix='a1260-boot-') as temp:
         temp = Path(temp)
@@ -70,6 +70,8 @@ def validate(boot, source):
     cmdline = next(line for line in selected if line.startswith('CONFIG_CMDLINE='))
     require('androidboot.hardware=mt6580' in cmdline,
             'Android hardware identifier must match init.mt6580.rc and fstab.mt6580')
+    require('androidboot.boot_devices=11120000.mmc' in cmdline,
+            'Boot device must enable Android by-name links for the eMMC controller')
     for setting in ('CONFIG_ARM_APPENDED_DTB_INITRD_FROM_BOOTLOADER=y',
                     'CONFIG_INITRAMFS_SOURCE=""', 'CONFIG_USB_CONFIGFS_F_FS=y',
                     'CONFIG_USB_CONFIGFS_ACM=y', '# CONFIG_USB_G_SERIAL is not set',

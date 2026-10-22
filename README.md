@@ -47,6 +47,12 @@ It does not replace filesystem integrity checks or hardware boot validation.
 * userdata: mmcblk0p21, 5317853184 bytes, ext4.
 * product and system_ext live inside system. No super partition or A/B slots.
 
+The fstab uses `/dev/block/by-name/system`, `vendor`, `cache` and `userdata`.
+Android 17 first-stage discovery matches GPT PARTNAME before the kernel device
+name, so numbered paths like `mmcblk0p19` fail discovery even when eMMC and
+its GPT partitions are present. `androidboot.boot_devices=11120000.mmc`
+enables the global by-name links for this controller.
+
 Data and cache fstab entries do not request formatting. Existing userdata has
 not been migrated to Android 17 encryption or policy requirements. Original
 shipping API is unknown and is intentionally not fabricated. This target is an
