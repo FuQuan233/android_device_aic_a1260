@@ -14,6 +14,9 @@ PRODUCT_AAPT_CONFIG := normal hdpi
 PRODUCT_AAPT_PREF_CONFIG := hdpi
 PRODUCT_SOONG_NAMESPACES += $(LOCAL_PATH)
 
+# Standard 1 GiB heap profile; avoid ART falling back to a 16 MiB heap.
+$(call inherit-product, frameworks/native/build/phone-xhdpi-1024-dalvik-heap.mk)
+
 # Rebuild vendor interfaces from this source tree; legacy binary HALs are not
 # yet compatible with the mainline-style 6.18 hardware drivers.
 $(call soong_config_set,minigbm,platform,generic)

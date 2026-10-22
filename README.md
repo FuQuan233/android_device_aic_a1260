@@ -133,3 +133,24 @@ flags until a real MT6580 ALSA driver is ready. These flags are present in
 both the boot header command line and the compiled kernel command line,
 because the appended-DTB handover does not import LK bootargs. This enables
 software audio services, not physical microphone or speaker operation.
+
+
+## Framework boot fixes after USB ADB became available
+
+USB ADB shell, reconnect and UID 0 shell are verified on hardware. The reference
+AIDL core/effect audio services register and audioserver remains running.
+System server starts, but completion is still under investigation.
+
+ART's shipped boot image uses CMC while a kernel without USERFAULTFD makes the
+runtime fall back to CC/read barriers. The kernel Android profile now enables
+USERFAULTFD so ART can use the image. The standard 1 GiB Dalvik heap profile
+replaces the unset 16 MiB default.
+
+The early-only mount_all pass suppressed nonencrypted, leaving installd and
+other main/late_start services stopped. Userdata now uses latemount and a
+late-fs mount_all pass queues the normal startup event. Metadata is mounted
+in first stage so aconfig can initialize before Java services read flags.
+The 41287680-byte previously unformatted metadata partition was backed up to
+/home/fuquan/AIC/out/wt6580-reference/metadata-before-android17.img and initialized
+as ext4 explicitly during bring-up; the fstab does not format it or userdata.
+UART logcat forwarding stops when USB ADB is available to reduce CPU load.

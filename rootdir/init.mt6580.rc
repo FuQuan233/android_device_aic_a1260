@@ -11,6 +11,10 @@ on fs
     # Make swap available before dex2oat reserves its initial heap.
     swapon_all /vendor/etc/fstab.mt6580
 
+# The late pass mounts userdata and queues nonencrypted to start main services.
+on late-fs
+    mount_all /vendor/etc/fstab.mt6580 --late
+
 on post-fs-data
     start vendor.a1260-logcat
     exec_start vendor.a1260-usb-setup
@@ -38,3 +42,7 @@ service vendor.a1260-logcat /system/bin/logcat -b main -b system -b crash -v bri
     group root shell log readproc
     seclabel u:r:shell:s0
     stdio_to_kmsg
+
+# Once USB works, keep UART forwarding from competing with framework startup.
+on property:sys.usb.state=adb
+    stop vendor.a1260-logcat
