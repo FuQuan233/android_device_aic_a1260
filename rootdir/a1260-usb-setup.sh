@@ -22,7 +22,10 @@ echo 1 > "$G/os_desc/use"
 echo 0x1 > "$G/os_desc/b_vendor_code"
 echo MSFT100 > "$G/os_desc/qw_sign"
 ln -s "$G/configs/b.1" "$G/os_desc/b.1"
+# init services inherit umask 077; shell adbd must traverse the parent too.
 mkdir -p /dev/usb-ffs/adb
+chown 2000:2000 /dev/usb-ffs /dev/usb-ffs/adb
+chmod 0770 /dev/usb-ffs /dev/usb-ffs/adb
 mount -t functionfs -o uid=2000,gid=2000,rmode=0770,fmode=0660 adb /dev/usb-ffs/adb
 [ -e /dev/usb-ffs/adb/ep0 ]
 echo 'A1260 USB: ADB FunctionFS mounted; ep0 present'

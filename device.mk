@@ -27,6 +27,7 @@ PRODUCT_PACKAGES += \
     libEGL_angle \
     libGLESv1_CM_angle \
     libGLESv2_angle \
+    com.android.hardware.audio \
     android.hardware.health-service.example \
     android.hardware.power-service.example \
     android.hardware.security.keymint-service.nonsecure \
@@ -59,3 +60,14 @@ PRODUCT_SYSTEM_PROPERTIES += \
     ro.zygote=zygote32 \
     debug.renderengine.backend=skiaglthreaded
 PRODUCT_SYSTEM_EXT_PROPERTIES += service.sf.prime_shader_cache=0
+
+# Reference AIDL audio services keep AudioFlinger available during bring-up.
+# Physical MT6580 audio is not implemented; the boot flags select stub I/O.
+$(call inherit-product, hardware/interfaces/audio/aidl/default/audio_effects.mk)
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/audio/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+    frameworks/av/services/audiopolicy/config/primary_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/primary_audio_policy_configuration.xml \
+    frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+    frameworks/av/services/audiopolicy/config/bluetooth_audio_policy_configuration_7_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth_audio_policy_configuration_7_0.xml \
+    frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+    frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml

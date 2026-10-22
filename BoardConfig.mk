@@ -23,6 +23,7 @@ BOARD_KERNEL_CMDLINE += androidboot.hardware=mt6580 androidboot.boot_devices=111
 BOARD_KERNEL_CMDLINE += maxcpus=1 clk_ignore_unused pd_ignore_unused panic=15
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive enforcing=0
 BOARD_KERNEL_CMDLINE += printk.devkmsg=on
+BOARD_KERNEL_CMDLINE += androidboot.audio.tinyalsa.simulate_input=true androidboot.audio.tinyalsa.ignore_output=true
 BOARD_RAMDISK_USE_LZ4 := false
 
 TARGET_KERNEL_SOURCE := kernel/aic/mt6580

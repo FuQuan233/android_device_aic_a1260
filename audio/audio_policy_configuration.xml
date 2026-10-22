@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<audioPolicyConfiguration version="7.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <globalConfiguration speaker_drc_enabled="false"/>
+    <modules>
+        <xi:include href="primary_audio_policy_configuration.xml"/>
+        <xi:include href="r_submix_audio_policy_configuration.xml"/>
+        <xi:include href="bluetooth_audio_policy_configuration_7_0.xml"/>
+    </modules>
+    <xi:include href="audio_policy_volumes.xml"/>
+    <xi:include href="default_volume_tables.xml"/>
+</audioPolicyConfiguration>

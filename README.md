@@ -102,8 +102,9 @@ subprograms/callbacks, so the device-scoped loader patch selects the existing
 inline DSCP/netd objects instead of their `@funcs` variants. Maps, network
 policies and actual loading/verifier/JIT checks remain enabled. This choice
 is now hardware-tested: NetBpfLoad reports success and exits with status 0.
-The next observed blocker is netd repeatedly exiting with status 1 and
-restarting zygote. A source audit found missing raw tables, connection marks,
+The previous blocker was netd repeatedly exiting with status 1 and
+restarting zygote. The expanded kernel configuration now keeps netd running
+on hardware without that restart loop. A source audit found missing raw tables, connection marks,
 REJECT, TCPMSS, policy routing and XFRM support in the kernel profile; these
 are enabled and checked by the boot validator. Early zram activation is hardware-tested
 and the prior ART allocation failure is no longer present in UART output.
@@ -119,5 +120,16 @@ avoid feedback. USB uses ADB only (18d1:4ee7), per-interface device class,
 WinUSB OS descriptors and explicit FunctionFS permissions. The common USB rc
 links ffs.adb and binds the UDC only when adbd provides descriptors. CDC/ACM,
 its console service and ttyGS0 kernel command line are removed. Setup and
-FunctionFS readiness markers are written to the UART. Both the expanded
-netd configuration and ADB enumeration still require hardware verification.
+FunctionFS readiness markers are written to the UART. The expanded netd configuration is hardware-tested. The next full UART log
+shows adbd starting only its TCP/vsock backend: init's inherited umask 077
+left /dev/usb-ffs inaccessible to shell after adbd dropped privileges. Setup
+now explicitly assigns shell ownership and mode 0770 to both parent and mount
+directories; USB enumeration needs another hardware boot to confirm.
+
+The same log shows audioserver repeatedly dereferencing a missing audio HAL.
+The reference AIDL audio APEX, effects and policy XML are now included. Primary
+streams simulate input and discard output through the reference HAL's boot
+flags until a real MT6580 ALSA driver is ready. These flags are present in
+both the boot header command line and the compiled kernel command line,
+because the appended-DTB handover does not import LK bootargs. This enables
+software audio services, not physical microphone or speaker operation.
