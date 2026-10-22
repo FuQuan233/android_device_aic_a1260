@@ -1,0 +1,13 @@
+diff --git a/build/tasks/kernel.mk b/build/tasks/kernel.mk
+index 15ce95b..2a96c40 100644
+--- a/build/tasks/kernel.mk
++++ b/build/tasks/kernel.mk
+@@ -528,7 +528,7 @@ $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_CONFIG) $(DEPMOD) $(DTC) $(KERNEL_MODULE
+ 			echo "Building DTBs"; \
+ 			$(call make-kernel-target,dtbs); \
+ 		fi
+-	$(hide) if grep -q '=m' $(KERNEL_CONFIG); then \
++	$(hide) if grep -q '^CONFIG_[A-Za-z0-9_]*=m$$' $(KERNEL_CONFIG); then \
+ 			echo "Building Kernel Modules"; \
+ 			$(call make-kernel-target,modules) || exit "$$?"; \
+ 			echo "Installing Kernel Modules"; \

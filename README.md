@@ -13,6 +13,13 @@ Place FuQuan233/android_kernel_aic_a1260, branch kernel-6.18, at
 `kernel/aic/mt6580`. In the existing workspace that path is a local symlink to
 `~/AIC/kernel7`. Android Clang r547379 is selected for the kernel.
 
+Two local build-system fixes are saved under `patches/`. On a fresh checkout,
+apply `lineage-kernel-module-detection.patch` from `vendor/lineage` and
+`soong-memory-tuning.patch` from `build/soong` with `git apply`. The first
+prevents `hardware=mt6580` in CONFIG_CMDLINE from being mistaken for a module.
+The second forwards Go memory tuning into Soong's isolated environment.
+
+    export OUT_DIR=out SOONG_NINJA=ninja GOGC=25 GOMEMLIMIT=22GiB
     source build/envsetup.sh
     lunch lineage_a1260-cp2a-userdebug
     m -j12 bootimage
