@@ -160,3 +160,17 @@ opening/closing a PF_KEY socket. Without it, errno 97 propagates as a fatal
 system_server exception. The Android kernel profile now includes PF_KEY.
 Hardware also confirmed the 16 MiB heap eventually causes system_server OOM,
 so the 1 GiB heap profile is required rather than just a startup optimization.
+
+
+The UFFD/CMC hardware boot exposed a separate kernel failure: pstore records
+ext4_dirty_folio warnings and a NULL call from unmap_page_range during exec
+in a UID 9999 child, followed by a panic and reboot at about 38 seconds.
+A zygote SIGBUS was also observed. These findings do not establish that USB
+FIFO sizing caused the crash. Evidence is saved in
+/home/fuquan/AIC/out/a1260-build-logs/boot-cmc-previous-pstore.log.
+
+The product now explicitly uses PRODUCT_ENABLE_UFFD_GC=false, the supported
+non-GKI ART CC configuration. Boot images and all dexpreopt outputs must be
+rebuilt with the runtime property, rather than mixing CMC images and CC.
+This changes GC configuration only; the full non-Go product remains enabled.
+Hardware completion is still pending.

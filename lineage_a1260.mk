@@ -9,6 +9,9 @@ $(call inherit-product, vendor/lineage/config/common_mobile_full.mk)
 $(call inherit-product, vendor/lineage/config/wifionly.mk)
 $(call inherit-product, device/aic/a1260/device.mk)
 
+# Non-GKI ARMv7: compile images and runtime consistently for ART CC GC.
+PRODUCT_ENABLE_UFFD_GC := false
+
 PRODUCT_NAME := lineage_a1260
 PRODUCT_DEVICE := a1260
 PRODUCT_BRAND := AIC
