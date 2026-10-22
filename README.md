@@ -42,6 +42,9 @@ CDC console. The watchdog service keeps the 30-second hardware watchdog alive.
 ADB/ACM configfs integration still requires hardware verification.
 Post-fs-data configures 512 MiB of logical LZ4 zram swap. Pages consume RAM
 as needed; no swap backing file or partition is written to eMMC.
+Manual activation with Android 17 toybox has passed on hardware. A compressed
+LZ4HC EROFS loop image also mounts and passes a 270000-byte read/SHA256 check.
+The corresponding Android init actions and full system image are still untested.
 
 ## Hardware status
 
