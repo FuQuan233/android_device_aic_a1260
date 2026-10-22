@@ -96,7 +96,12 @@ SHA256/SHA512 and the boot validator checks both. Hardware now activates all
 policy checks on hardware. Functional BPF loading then found upstream ARM32
 JIT missing atomic opcode 0xc3; kernel commit a3350b4e7 adds native ARMv7
 atomic emission, with emulator execution tests. On-device loading with this
-kernel fix remains to be verified. Early zram activation is hardware-tested
+kernel fix now passes the atomic instructions on hardware: offload, test and
+CLAT objects load before the next DSCP failure. ARM32 JIT cannot link BPF
+subprograms/callbacks, so the device-scoped loader patch selects the existing
+inline DSCP/netd objects instead of their `@funcs` variants. Maps, network
+policies and actual loading/verifier/JIT checks remain enabled. This choice
+still needs a hardware test. Early zram activation is hardware-tested
 and the prior ART allocation failure is no longer present in UART output.
 The metadata partition is not mounted yet; aconfig reports read-only metadata
 storage and remains a separate follow-up issue.

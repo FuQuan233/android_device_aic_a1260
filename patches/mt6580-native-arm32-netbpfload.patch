@@ -34,10 +34,39 @@ index bee2681..98ba428 100644
          "-Wformat",
          "-Wformat-signedness",
 diff --git a/bpf/loader/NetBpfLoad.cpp b/bpf/loader/NetBpfLoad.cpp
-index 7ba3247..0cae475 100644
+index 7ba3247..59860f0 100644
 --- a/bpf/loader/NetBpfLoad.cpp
 +++ b/bpf/loader/NetBpfLoad.cpp
-@@ -1516,6 +1516,21 @@ static int doLoad(char** argv, char * const envp[]) {
+@@ -1348,10 +1348,27 @@ static bool loadObject(const char* const progPath, const bool useLibbpf = true)
+ #define APEXROOT "/apex/com.android.tethering"
+ #define BPFROOT APEXROOT "/etc/bpf/mainline/"
+ 
++static bool isMt6580NativeArm32Bringup() {
++#ifdef AIC_MT6580_ARM32_BRINGUP
++    return (isUserdebug || isEng) && isArm() && isKernel32Bit() &&
++           isUserspace32bit() && isKernelVersion(6, 18) &&
++           GetProperty("ro.hardware", "") == "mt6580";
++#else
++    return false;
++#endif
++}
++
+ static bool loadAllObjects() {
+     // Enable on kernels that have the BPF CFI backports, see: b/488034908
+     // b/494690861: funcs may trigger Real-time Kernel Protection (RKP)
+-    bool funcs = isAtLeast26Q2 && isAtLeastKernelVersion(6, 6, 118);
++    // ARM32 JIT cannot link BPF subprograms/callbacks. Use the existing
++    // inline variants, with the same maps and policies, for this debug port.
++    const bool nativeArm32 = isMt6580NativeArm32Bringup();
++    bool funcs = isAtLeast26Q2 && isAtLeastKernelVersion(6, 6, 118) && !nativeArm32;
++    if (nativeArm32) {
++        ALOGI("[MT6580 bring-up] Loading inline DSCP/netd BPF programs; "
++              "ARM32 JIT subprogram calls unavailable.");
++    }
+ 
+     if (!loadObject(BPFROOT "offload.o", /*libbpf*/false)) return false;
+     if (!loadObject(BPFROOT "test.o")) return false;
+@@ -1516,6 +1533,16 @@ static int doLoad(char** argv, char * const envp[]) {
  
      const int first_api_level = GetIntProperty("ro.board.first_api_level", api_level_full / 100);
  
@@ -45,12 +74,7 @@ index 7ba3247..0cae475 100644
 +    // not use the 32-on-64 compat interfaces discussed below. Allow the actual
 +    // BPF syscalls, map operations and verifier checks to diagnose this port;
 +    // keep every functional failure fatal. This is not a VTS compliance claim.
-+    bool nativeArm32Bringup = false;
-+#ifdef AIC_MT6580_ARM32_BRINGUP
-+    nativeArm32Bringup = (isUserdebug || isEng) && isArm() && isKernel32Bit() &&
-+                        isUserspace32bit() && isKernelVersion(6, 18) &&
-+                        GetProperty("ro.hardware", "") == "mt6580";
-+#endif
++    const bool nativeArm32Bringup = isMt6580NativeArm32Bringup();
 +    if (nativeArm32Bringup) {
 +        ALOGW("[MT6580 bring-up] Testing native ARM32 on Linux 6.18; "
 +              "architecture policy exemptions enabled, BPF validation retained.");
@@ -59,7 +83,7 @@ index 7ba3247..0cae475 100644
      // last in U QPR2 beta1
      const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
      // first in U QPR2 beta~2
-@@ -1590,18 +1605,18 @@ static int doLoad(char** argv, char * const envp[]) {
+@@ -1590,18 +1617,18 @@ static int doLoad(char** argv, char * const envp[]) {
      // see also: //system/netd/tests/kernel_test.cpp TestKernel64Bit
      if (isAtLeastV && isKernel32Bit() && isAtLeastKernelVersion(5, 16)) {
          ALOGE("Android V+ platform with 32 bit kernel version >= 5.16.0 is unsupported");
@@ -81,7 +105,7 @@ index 7ba3247..0cae475 100644
      }
  
      // Various known ABI layout issues, particularly wrt. bpf and ipsec/xfrm.
-@@ -1670,7 +1685,7 @@ static int doLoad(char** argv, char * const envp[]) {
+@@ -1670,7 +1697,7 @@ static int doLoad(char** argv, char * const envp[]) {
          if (isArm() && (isTV() || isWear())) {
              // exempt Arm TV or Wear devices (arm32 ABI is far less problematic than x86-32)
              ALOGW("[Arm TV/Wear] 32-bit userspace unsupported on 6.2+ kernels.");
@@ -90,7 +114,7 @@ index 7ba3247..0cae475 100644
              // also exempt Arm devices upgrading with major kernel rev from T-
              // might possibly be better for them to run with a newer kernel...
              ALOGW("[Arm KernelUpRev] 32-bit userspace unsupported on 6.2+ kernels.");
-@@ -1693,7 +1708,7 @@ static int doLoad(char** argv, char * const envp[]) {
+@@ -1693,7 +1720,7 @@ static int doLoad(char** argv, char * const envp[]) {
      if (isUserspace32bit() && isAtLeastKernelVersion(6, 13)) {
          // due to previous check only reachable on Arm && (<=T kernel uprev || TV || Wear)
          ALOGE("64-bit userspace required on 6.13+ kernels.");
