@@ -24,11 +24,15 @@ The second forwards Go memory tuning into Soong's isolated environment.
     lunch lineage_a1260-cp2a-userdebug
     m -j12 bootimage
     m -j12 systemimage vendorimage
+    python3 device/aic/a1260/tools/validate_images.py out/target/product/a1260
 
 The build output is `out/target/product/a1260`. The early bring-up target is
 `bootimage`; check external ramdisk handover before installing system/vendor.
 The stock boot and recovery are 16 MiB, header v0, page size 2048, kernel
 0x80008000, ramdisk 0x84000000 and tags 0x8e000000. DTB is appended to zImage.
+The image checker checks boot contents, filesystem superblocks, raw/sparse
+expanded sizes against the fixed GPT limits, and records each image's SHA256.
+It does not replace filesystem integrity checks or hardware boot validation.
 
 ## Actual storage and boot configuration
 
