@@ -77,7 +77,19 @@ def validate(boot, source):
                     'CONFIG_USB_CONFIGFS_ACM=y', '# CONFIG_USB_G_SERIAL is not set',
                     'CONFIG_VFP=y', 'CONFIG_NEON=y', 'CONFIG_SECURITY_SELINUX=y',
                     'CONFIG_DM_VERITY=y', 'CONFIG_CRYPTO_SHA256=y',
-                    'CONFIG_CRYPTO_SHA512=y'):
+                    'CONFIG_CRYPTO_SHA512=y', 'CONFIG_IP_NF_RAW=y',
+                    'CONFIG_IP6_NF_RAW=y', 'CONFIG_IP_NF_TARGET_REJECT=y',
+                    'CONFIG_IP6_NF_TARGET_REJECT=y', 'CONFIG_IP_MULTIPLE_TABLES=y',
+                    'CONFIG_IPV6_MULTIPLE_TABLES=y', 'CONFIG_XFRM_USER=y',
+                    'CONFIG_NETFILTER_XT_TARGET_CONNMARK=y',
+                    'CONFIG_NETFILTER_XT_MATCH_CONNMARK=y',
+                    'CONFIG_NETFILTER_XT_MATCH_POLICY=y',
+                    'CONFIG_NETFILTER_XT_MATCH_MARK=y',
+                    'CONFIG_NETFILTER_XT_MATCH_STATE=y',
+                    'CONFIG_NETFILTER_XT_MATCH_U32=y',
+                    'CONFIG_NETFILTER_XT_TARGET_TCPMSS=y',
+                    'CONFIG_NETFILTER_XT_MATCH_QUOTA2=y',
+                    'CONFIG_FUSE_FS=y'):
         require(setting in selected, 'Missing built kernel setting: ' + setting)
     return {'product': 'lineage_a1260', 'boot_bytes': len(image),
             'boot_sha256': hashlib.sha256(image).hexdigest(), 'header_version': version,

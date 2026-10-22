@@ -12,6 +12,7 @@ on fs
     swapon_all /vendor/etc/fstab.mt6580
 
 on post-fs-data
+    start vendor.a1260-logcat
     exec_start vendor.a1260-usb-setup
     start vendor.a1260-cdc-console
 
@@ -35,3 +36,13 @@ service vendor.a1260-cdc-console /system/bin/sh
     user root
     group root shell log readproc
     seclabel u:r:shell:s0
+
+# Keep fatal userspace diagnostics visible on the physical UART while USB
+# debug is being brought up. Exclude the kernel buffer to avoid feedback.
+service vendor.a1260-logcat /system/bin/logcat -b main -b system -b crash -v brief *:E Netd:V adbd:V IptablesRestoreController:V
+    class core
+    disabled
+    user root
+    group root shell log readproc
+    seclabel u:r:shell:s0
+    stdio_to_kmsg
