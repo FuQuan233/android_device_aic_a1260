@@ -174,3 +174,14 @@ non-GKI ART CC configuration. Boot images and all dexpreopt outputs must be
 rebuilt with the runtime property, rather than mixing CMC images and CC.
 This changes GC configuration only; the full non-Go product remains enabled.
 Hardware completion is still pending.
+
+Android has not displayed a boot animation on the physical LCD. An active
+bootanimation process is not evidence of scanout. HWC logs show
+`DRM/KMS master access required`, followed by a headless null display; DRM
+state also shows the CRTC disabled and no framebuffer. The DRM clients table
+shows the graphics allocator holding master rather than the compositor.
+This display-only driver has no render node, so cros_gralloc falls back to
+the primary node and implicitly becomes master. Apply
+`patches/minigbm-release-allocator-drm-master.patch` from `external/minigbm`
+to release that ownership after allocator initialization, matching minigbm's
+existing GBM discovery behavior. Physical Android scanout remains unverified.
