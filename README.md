@@ -65,7 +65,12 @@ not been migrated to Android 17 encryption or policy requirements. Original
 shipping API is unknown and is intentionally not fabricated. This target is an
 experimental port, not a claim of launch-device/VTS compliance.
 
-The kernel profile keeps CPU0 only until secondary-core release is implemented.
+The kernel profile boots all four Cortex-A7 cores through the MT6580 SPM
+power sequence and non-secure boot vector. Physical ARM timers avoid the
+timekeeping stalls observed with virtual timers on this firmware.
+Hardware verifies all four CPUs online, local timer interrupts, correct
+shared atomic updates, monotonic time across CPU migrations and 3.98-way
+parallel execution. CPU hot-unplug, DVFS and suspend are still unfinished.
 SELinux is permissive during bring-up. Debug builds allow root ADB; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
 The Android image exposes only FunctionFS/ADB, without ACM or ttyGS0.
 USB ADB enumeration and root shell are verified; large bulk transfers remain unreliable.
@@ -214,8 +219,10 @@ primary card nodes remain limited to system/graphics (0660). Five matching
 vendor minigbm modules were deployed atomically through root ADB, followed by
 a hardware reboot. The vendor image includes the same fix.
 
-Cold startup still triggers SystemUI ANRs on the current single-core profile;
-after startup it stays alive and renders. Bluetooth separately aborts because
+The previous single-core profile triggered SystemUI ANRs during cold startup.
+The four-core physical-timer build reaches the desktop without SystemUI ANRs
+in the captured boot events; long-term startup performance remains to be assessed.
+Bluetooth separately aborts because
 real-time scheduling is unavailable. Neither issue is treated as a GPU fix.
 SELinux remains permissive; physical audio/Wi-Fi are still pending.
 
