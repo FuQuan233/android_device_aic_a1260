@@ -66,9 +66,9 @@ shipping API is unknown and is intentionally not fabricated. This target is an
 experimental port, not a claim of launch-device/VTS compliance.
 
 The kernel profile keeps CPU0 only until secondary-core release is implemented.
-SELinux is permissive during bring-up. Debug builds allow root ADB and a root
-CDC console. The watchdog service keeps the 30-second hardware watchdog alive.
-ADB/ACM configfs integration still requires hardware verification.
+SELinux is permissive during bring-up. Debug builds allow root ADB; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
+The Android image exposes only FunctionFS/ADB, without ACM or ttyGS0.
+ADB configfs integration still requires hardware verification.
 The fs action configures 512 MiB of logical LZ4 zram swap before ART starts.
 Android's ordinary overcommit policy is applied in init for the same reason. Pages consume RAM
 as needed; no swap backing file or partition is written to eMMC.
@@ -115,6 +115,9 @@ TEE-backed credential storage and production security policy remain unfinished.
 
 During debug bring-up a filtered main/system/crash logcat reader sends errors
 and Netd/adbd messages to kmsg/UART. The kernel log buffer is excluded to
-avoid feedback. USB first exposes ACM alone while adbd prepares FunctionFS;
-the common USB rc then rebinds ACM plus ADB once descriptors are ready.
-Both the expanded netd configuration and this USB handover require testing.
+avoid feedback. USB uses ADB only (18d1:4ee7), per-interface device class,
+WinUSB OS descriptors and explicit FunctionFS permissions. The common USB rc
+links ffs.adb and binds the UDC only when adbd provides descriptors. CDC/ACM,
+its console service and ttyGS0 kernel command line are removed. Setup and
+FunctionFS readiness markers are written to the UART. Both the expanded
+netd configuration and ADB enumeration still require hardware verification.

@@ -72,9 +72,13 @@ def validate(boot, source):
             'Android hardware identifier must match init.mt6580.rc and fstab.mt6580')
     require('androidboot.boot_devices=11120000.mmc' in cmdline,
             'Boot device must enable Android by-name links for the eMMC controller')
+    require('console=ttyGS' not in cmdline, 'USB serial console must be removed')
+    for setting in ('CONFIG_USB_CONFIGFS_ACM=y', 'CONFIG_USB_F_ACM=y',
+                    'CONFIG_USB_U_SERIAL=y', 'CONFIG_U_SERIAL_CONSOLE=y'):
+        require(setting not in selected, 'Unexpected USB serial setting: ' + setting)
     for setting in ('CONFIG_ARM_APPENDED_DTB_INITRD_FROM_BOOTLOADER=y',
                     'CONFIG_INITRAMFS_SOURCE=""', 'CONFIG_USB_CONFIGFS_F_FS=y',
-                    'CONFIG_USB_CONFIGFS_ACM=y', '# CONFIG_USB_G_SERIAL is not set',
+                    '# CONFIG_USB_G_SERIAL is not set',
                     'CONFIG_VFP=y', 'CONFIG_NEON=y', 'CONFIG_SECURITY_SELINUX=y',
                     'CONFIG_DM_VERITY=y', 'CONFIG_CRYPTO_SHA256=y',
                     'CONFIG_CRYPTO_SHA512=y', 'CONFIG_IP_NF_RAW=y',

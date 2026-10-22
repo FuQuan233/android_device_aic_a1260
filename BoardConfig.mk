@@ -18,7 +18,7 @@ BOARD_KERNEL_IMAGE_NAME := zImage
 BOARD_KERNEL_APPEND_DTBS := mediatek/mt6580-wt6580-we-n-drm.dtb
 BOARD_MKBOOTIMG_ARGS += --header_version 0 --kernel_offset 0x00008000
 BOARD_MKBOOTIMG_ARGS += --ramdisk_offset 0x04000000 --tags_offset 0x0e000000
-BOARD_KERNEL_CMDLINE := earlycon console=ttyS0,921600n8 console=ttyGS0
+BOARD_KERNEL_CMDLINE := earlycon console=ttyS0,921600n8
 BOARD_KERNEL_CMDLINE += androidboot.hardware=mt6580 androidboot.boot_devices=11120000.mmc
 BOARD_KERNEL_CMDLINE += maxcpus=1 clk_ignore_unused pd_ignore_unused panic=15
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive enforcing=0

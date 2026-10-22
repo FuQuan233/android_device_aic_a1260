@@ -14,7 +14,6 @@ on fs
 on post-fs-data
     start vendor.a1260-logcat
     exec_start vendor.a1260-usb-setup
-    start vendor.a1260-cdc-console
 
 service vendor.a1260-watchdog /system/bin/watchdogd 5 25
     class core
@@ -28,14 +27,7 @@ service vendor.a1260-usb-setup /vendor/bin/a1260-usb-setup
     user root
     group root shell
     seclabel u:r:vendor_init:s0
-
-service vendor.a1260-cdc-console /system/bin/sh
-    class core
-    console ttyGS0
-    disabled
-    user root
-    group root shell log readproc
-    seclabel u:r:shell:s0
+    stdio_to_kmsg
 
 # Keep fatal userspace diagnostics visible on the physical UART while USB
 # debug is being brought up. Exclude the kernel buffer to avoid feedback.

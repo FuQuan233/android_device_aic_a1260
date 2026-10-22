@@ -1,16 +1,7 @@
-# This action is imported before init.usb.configfs.rc. Prepare ACM before
-# the common FFS-ready action binds the controller, retaining standard "adb".
-on property:sys.usb.config=adb && property:sys.usb.configfs=1
-    write /config/usb_gadget/g1/UDC none
-    write /config/usb_gadget/g1/bDeviceClass 239
-    write /config/usb_gadget/g1/bDeviceSubClass 2
-    write /config/usb_gadget/g1/bDeviceProtocol 1
-    symlink /config/usb_gadget/g1/functions/acm.gs0 /config/usb_gadget/g1/configs/b.1/f2
-    # Expose the debug console while adbd initializes FunctionFS. Do not
-    # link ffs.adb before it has descriptors, or gadget binding will fail.
-    write /config/usb_gadget/g1/UDC ${sys.usb.controller}
-
-# This file is imported before the common USB rc. Unbind the temporary ACM
-# configuration before the common action links ffs.adb and binds both.
+# Standard init.usb.configfs.rc owns the FunctionFS link and UDC binding.
+# Keep progress markers visible on the physical UART during ADB bring-up.
 on property:sys.usb.ffs.ready=1 && property:sys.usb.config=adb && property:sys.usb.configfs=1
-    write /config/usb_gadget/g1/UDC none
+    write /dev/kmsg "A1260 USB: adbd FunctionFS descriptors ready"
+
+on property:sys.usb.state=adb && property:sys.usb.configfs=1
+    write /dev/kmsg "A1260 USB: common ADB configfs action completed"
