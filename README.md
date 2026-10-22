@@ -92,8 +92,12 @@ system/vendor and data/cache mount successfully. Framework/UI startup and ADB
 remain under bring-up. APEX dm-verity requires registered Crypto API SHA256
 support even when board-level AVB is disabled; the kernel profile now includes
 SHA256/SHA512 and the boot validator checks both. Hardware now activates all
-40 APEX packages; the next observed blocker is netbpfload's ARM32 architecture
-policy exit (status 8). The opt-in patch above allows functional BPF testing.
+40 APEX packages. The opt-in patch above passes the ARM32 architecture
+policy checks on hardware. Functional BPF loading then found upstream ARM32
+JIT missing atomic opcode 0xc3; kernel commit a3350b4e7 adds native ARMv7
+atomic emission, with emulator execution tests. On-device loading with this
+kernel fix remains to be verified. Early zram activation is hardware-tested
+and the prior ART allocation failure is no longer present in UART output.
 The metadata partition is not mounted yet; aconfig reports read-only metadata
 storage and remains a separate follow-up issue.
 
