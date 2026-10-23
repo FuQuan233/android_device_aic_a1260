@@ -347,7 +347,7 @@ and two contacts. Android InputReader identifies an internal TOUCH/TOUCH_MT
 device. The input name EP0110M09 comes from upstream's firmware vendor-ID
 heuristic; it is not an independent EDT panel identification. Real taps,
 drags and releases generate interrupts and complete input events. The user
-confirms accurate tapping, swiping and two-finger operation. This repair only
+confirms accurate tapping and swiping; two-finger operation is unverified. This repair only
 requires the rebuilt boot image; the existing Android input stack handles it.
 
 A transient physical display misalignment was reported during this boot and
