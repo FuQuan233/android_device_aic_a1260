@@ -2,6 +2,10 @@
 
 ## 时钟、电源域和关机（2026-10-23）
 
+- **#37 亮屏恢复未通过**：用户报告熄屏后无法点亮；ADB 仍能执行命令，Android 收到实体电源键唤醒并报告 ON，10 秒后因锁屏超时回到 OFF，未捕获内核崩溃。实际背光/显示恢复原因待定位，不能将 #37 标为通过。标准产品 boot/kernel 暂保留 #32；故障记录为 `out/a1260-runtime-pm/wake-failure-37{,-later}.txt`。
+- 后续现场定位到 PWM 的影子寄存器更新未反映到输出：保持亮屏、设满亮度后，PWM_EN=1/HIGH_WIDTH=1024，但 GPIO66 输入仍为低；延长 COMMIT 脉冲无效。按 BSP 的直接更新模式写 0x20=3 并重写占空比/使能后，GPIO66 变高，用户确认背光恢复、画面正常。驱动现改用直接更新，保留 DISP 断电；尚不能确定缺失的是哪一个 shadow latch 触发条件。
+- #39 已编译上机，自动熄屏/亮屏检查显示 DISP/MFG 均可断电、恢复后 RDMA 欠流和异常为 0；用户手动确认背光全灭、亮屏画面正常。标准 boot/kernel 已更新为 #39。排查期间临时 `stay_on_while_plugged_in=2` 已恢复原值 0。熄屏时重启 adbd 曾造成 USB 无法枚举；保持唤醒后重启 adbd 可以重连，USB/系统待机恢复需单独定位，不能把 PWM 修复当作 USB 问题也已解决。
+
 - Android 产品已撤掉 `clk_ignore_unused` / `pd_ignore_unused`；#29 启动完成，两轮熄屏/亮屏后 DSI 300 MHz、RDMA 欠流和异常均为 0。修复 MT6580 DSI 在时钟开启前访问寄存器、依赖 LK 遗留门控状态的问题。
 - 新增 SMI 总线时钟与 DISP/ISP genpd 描述；ISP 实机为关闭，控制寄存器 0x3f12、SPM 双状态位均清零。DISP 已在 #35 接入 SMI/LARB0 保存恢复并撤掉 ALWAYS_ON：四轮熄屏亮屏中两个 SPM 寄存器的 DISP 位均在熄屏时清零，亮屏后恢复且 RDMA 欠流/异常均为 0；用户确认画面、触摸正常。GPU 的 MFG 已在 #31 接入 100 ms runtime autosuspend：真实绘制回读后再次断电，两个熄屏/亮屏周期正常，SPM 双状态寄存器的 MFG 位清零。完整 PLL 父子关系和全部外设门控仍待补齐。
 - #30 GPU 断电试验导致黑屏、重启及 USB 枚举失败；#31 临时保留共享 MPLL_D5 后恢复。#32 已按固件 mux 接入 SMI、USB、MFG、MSDC0、PWM 父时钟与 D5→D10→D20→D40 引用链，D5 改用硬件 SET/CLR，并移除无条件 CLK_IS_CRITICAL。实机 SMI=MPLL/5，USB=UPLL/16，MFG=MPLL/3，MSDC0=UPLL/6；GPU 断电后 D5 由 SMI 保留一个正常引用。开机、GPU 绘制回读后再次断电、两轮熄屏亮屏通过，RDMA 欠流/异常均为 0，ADB 正常。已更新标准 boot/kernel 产物；记录在 `out/a1260-runtime-pm/clock-parents-validation.txt`。
