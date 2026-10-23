@@ -4,9 +4,6 @@ on init
     # Composer 0 means the minimum visible level; bl_power handles screen-off.
     setprop vendor.hwc.drm.backlight_min 4
     start vendor.a1260-watchdog
-    # Wake IRQs are not ported yet; s2idle currently loses USB permanently.
-    # TODO: Remove this temporary lock after suspend/resume works (see TODO.md).
-    write /sys/power/wake_lock a1260-bringup
     # Apply Android's normal overcommit policy before ART reserves its heap.
     write /proc/sys/vm/overcommit_memory 1
 
