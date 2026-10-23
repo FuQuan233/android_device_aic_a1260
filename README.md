@@ -70,7 +70,7 @@ power sequence and non-secure boot vector. Physical ARM timers avoid the
 timekeeping stalls observed with virtual timers on this firmware.
 Hardware verifies all four CPUs online, local timer interrupts, correct
 shared atomic updates, monotonic time across CPU migrations and 3.98-way
-parallel execution. CPU hot-unplug, DVFS and suspend are still unfinished.
+parallel execution. CPU hot-unplug, shared CPU frequency scaling and light s2idle have since been implemented; see the CPU power-management notes in TODO.md.
 SELinux is permissive during bring-up. Debug builds allow root ADB; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
 The Android image exposes only FunctionFS/ADB, without ACM or ttyGS0.
 USB ADB enumeration and root shell are verified; large bulk transfers remain unreliable.
@@ -314,7 +314,7 @@ The normal built-in-driver kernel (#8, `CONFIG_DEBUG_SPINLOCK=n`) reaches boot
 completion on four CPUs and passes GPU draw/readback and Settings/Home
 switching. An earlier boot's RCU stall was not conclusively diagnosed; longer
 runtime, memory pressure and broader application compatibility remain tracked
-in `TODO.md`. Fixed firmware clocks and the temporary bring-up wake lock remain.
+in `TODO.md`. The GPU retains its fixed firmware clock. The temporary bring-up wake lock was removed after standby wakeup validation.
 
 ## Physical remote keys
 
@@ -353,4 +353,4 @@ requires the rebuilt boot image; the existing Android input stack handles it.
 A transient physical display misalignment was reported during this boot and
 recovered without changes. The captured screenshot is normal, with zero
 RDMA underflows and abnormal events; the cause remains unconfirmed.
-The temporary suspend-prevention wake lock remains as tracked in TODO.md.
+The temporary suspend-prevention wake lock has been removed; the touch IRQ is disabled before hibernation so Android can enter standby without a spurious wake event.
