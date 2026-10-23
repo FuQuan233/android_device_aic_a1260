@@ -316,6 +316,23 @@ switching. An earlier boot's RCU stall was not conclusively diagnosed; longer
 runtime, memory pressure and broader application compatibility remain tracked
 in `TODO.md`. Fixed firmware clocks and the temporary bring-up wake lock remain.
 
+## Physical remote keys
+
+The original board has AW9523 on I2C1/0x5b and AW9106 on I2C2/0x5b.
+The stock kernel reads independent active-high inputs, rather than a matrix:
+16 keys on AW9523 and two on AW9106 (OUT3/F8 and OUT4/F7).
+The kernel uses its existing AW9523 driver, a six-line AW9106 GPIO driver,
+and the common `gpio-keys` device named `a1260-remote` with 16 ms debounce.
+I2C2 uses CLK_GATING_CTRL1 bit 16, not an adjacent bit to I2C0/I2C1.
+Both expanders and the input device register automatically after reboot.
+
+`keylayout/a1260-remote.kl` preserves the original `mtk-kpd.kl` mapping:
+Home, Back, DPAD/OK, volume, channel and function keys retain their stock
+identities. The owner confirmed the physical response and positions;
+captured key events include balanced presses/releases from both expanders.
+F-key reporting does not supply the original IR service/app actions.
+Unrequested AW9106 LED channels are not configured by the GPIO driver.
+
 ## FT6336U touch
 
 The reference BSP touch implementation and board parameters were confirmed

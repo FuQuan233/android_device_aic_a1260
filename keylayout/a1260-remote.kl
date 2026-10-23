@@ -1,0 +1,19 @@
+# Physical remote scan codes and Android mapping from the original mtk-kpd.kl.
+key 106 DPAD_RIGHT
+key 60 HOME
+key 103 DPAD_UP
+key 28 DPAD_CENTER
+key 59 F1
+key 105 DPAD_LEFT
+key 108 DPAD_DOWN
+key 158 F2
+key 139 MENU
+key 63 CHANNEL_DOWN
+key 62 CHANNEL_UP
+key 61 BACK
+key 115 VOLUME_UP
+key 114 VOLUME_DOWN
+key 102 F3
+key 64 F6
+key 66 F8
+key 65 F7
