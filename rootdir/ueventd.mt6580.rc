@@ -7,3 +7,7 @@
 /dev/watchdog              0600 root root
 /dev/watchdog0             0600 root root
 /dev/block/mmcblk0p*       0600 root root
+
+# drm_hwcomposer uses the standard backlight sysfs controller.
+/sys/devices/platform/backlight/backlight/backlight brightness 0664 system graphics
+/sys/devices/platform/backlight/backlight/backlight bl_power 0664 system graphics

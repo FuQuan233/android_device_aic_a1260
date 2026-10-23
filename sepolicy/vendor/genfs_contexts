@@ -1,0 +1,4 @@
+genfscon sysfs /devices/platform/1000f000.pmic-wrap/1000f000.pmic-wrap:pmic/mt6350-battery/power_supply/mt6350-battery u:object_r:sysfs_batteryinfo:s0
+genfscon sysfs /devices/platform/11009000.i2c/i2c-0/0-006b/power_supply/bq24190-charger u:object_r:sysfs_batteryinfo:s0
+genfscon sysfs /class/backlight u:object_r:sysfs_leds:s0
+genfscon sysfs /devices/platform/backlight/backlight u:object_r:sysfs_leds:s0

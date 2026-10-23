@@ -86,8 +86,12 @@ a 270000-byte read/SHA256 check. The full system image mounts successfully.
 The kernel has tested USB CDC, eMMC and 480x800 JD9161 DRM scanout. The Android graphics stack uses drm_hwcomposer, minigbm KMS buffers and
 the original Mali r8p0 GLES2 stack described below. Physical boot animation,
 desktop, Settings and GPU drawing/readback are verified.
-Reference health/power services are used until PMIC/battery and CPU power
-management drivers are ready. No legacy vendor binary HAL is assumed compatible.
+The standard Health service now reads the MT6350 AUXADC battery and BQ24296
+charger through power_supply. Battery presence, voltage, temperature and real
+USB charging/discharging status are verified. Capacity uses the reference BSP
+voltage curves and still needs cell/load calibration. The PMIC power key is
+also connected; the reference Power service remains until CPU power management
+is ready. Proprietary graphics userspace is handled by the integration below.
 Touch is verified; hardware audio and Wi-Fi remain unfinished.
 Camera and modem support are excluded because this unit has neither component.
 The opt-in external ramdisk FDT handover has been hardware-tested with a
@@ -266,6 +270,10 @@ On a fresh source tree, apply the updated
 the display, Lima and conditional Utgard changes), and
 `patches/drm-hwcomposer-mt6580-utgard.patch` in `external/drm_hwcomposer`.
 The latter selects this device's image-FD adapter only for `mt6580-utgard`.
+It also supports `vendor.hwc.drm.backlight_min`, set to 4 by this device's init:
+Composer's 0.0 is minimum visible brightness, while negative/off is handled by
+`bl_power`. The active PWM range is 4..255 and screen-off retains zero duty;
+the Android brightness slider and framework minimum are unchanged.
 
 Prepare the local vendor package before building:
 

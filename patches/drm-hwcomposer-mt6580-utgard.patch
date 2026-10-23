@@ -14,3 +14,72 @@ index 4183e34..c906230 100644
  
      relative_install_path: "hw",
      vendor: true,
+diff --git a/utils/SysfsBacklightController.cpp b/utils/SysfsBacklightController.cpp
+index 4135785..92b1952 100644
+--- a/utils/SysfsBacklightController.cpp
++++ b/utils/SysfsBacklightController.cpp
+@@ -22,6 +22,7 @@
+ 
+ #include <android-base/file.h>
+ #include <android-base/parseint.h>
++#include <android-base/properties.h>
+ #include <android-base/strings.h>
+ 
+ #include "utils/log.h"
+@@ -136,13 +137,19 @@ auto SysfsBacklightController::CreateInstanceFromName(
+   // apply the HLG OETF in the HAL.
+   bool hw_handles_encoding = file_contents == "linear";
+ 
++  // Composer brightness 0 is the minimum powered-on luminance. Power-off is
++  // represented separately by nullopt/bl_power. Some PWM backlights require
++  // a nonzero hardware floor for this lowest visible setting.
++  int minimum = ::android::base::GetIntProperty<int>(
++      "vendor.hwc.drm.backlight_min", 0, 0, max);
++
+   ALOGI("Backlight %s (powered=%s max=%d %s encoding)", path.str().c_str(),
+         powered ? "yes" : "no", max,
+         hw_handles_encoding ? "hw" : "hal applies");
+ 
+   return std::unique_ptr<BacklightController>(
+       new SysfsBacklightController(name, path.str(), powered,
+-                                   static_cast<float>(max), hw_handles_encoding,
++                                   static_cast<float>(max), minimum, hw_handles_encoding,
+                                    std::move(file_intf)));
+ }
+ 
+@@ -179,7 +186,7 @@ auto SysfsBacklightController::SetBrightness(std::optional<float> brightness)
+ 
+   float val = hw_handles_encoding_ ? *brightness : HlgOetf(*brightness);
+ 
+-  int normalized = static_cast<int>(max_ * val);
++  int normalized = static_cast<int>(min_ + (max_ - min_) * val);
+   ALOGV("Set brightness to %f (signal=%f/value=%d)", *brightness, val,
+         normalized);
+   std::string brightness_path(sysfs_path_);
+diff --git a/utils/SysfsBacklightController.h b/utils/SysfsBacklightController.h
+index e732315..e94c4e3 100644
+--- a/utils/SysfsBacklightController.h
++++ b/utils/SysfsBacklightController.h
+@@ -54,12 +54,13 @@ class SysfsBacklightController : public BacklightController {
+ 
+  private:
+   SysfsBacklightController(std::string name, std::string path, bool powered,
+-                           float max, bool hw_handles_encoding,
++                           float max, int min, bool hw_handles_encoding,
+                            std::unique_ptr<BacklightFileInterface> file_intf)
+       : name_(std::move(name)),
+         sysfs_path_(std::move(path)),
+         powered_(powered),
+         max_(max),
++        min_(min),
+         hw_handles_encoding_(hw_handles_encoding),
+         file_intf_(std::move(file_intf)) {
+   }
+@@ -68,6 +69,7 @@ class SysfsBacklightController : public BacklightController {
+   std::string sysfs_path_;
+   bool powered_;
+   float max_;
++  int min_;
+   bool hw_handles_encoding_;
+   std::unique_ptr<BacklightFileInterface> file_intf_;
+ };
