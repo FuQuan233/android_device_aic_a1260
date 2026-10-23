@@ -4,7 +4,8 @@
 
 - Android 产品已撤掉 `clk_ignore_unused` / `pd_ignore_unused`；#29 启动完成，两轮熄屏/亮屏后 DSI 300 MHz、RDMA 欠流和异常均为 0。修复 MT6580 DSI 在时钟开启前访问寄存器、依赖 LK 遗留门控状态的问题。
 - 新增 SMI 总线时钟与 DISP/ISP genpd 描述；ISP 实机为关闭，控制寄存器 0x3f12、SPM 双状态位均清零。DISP 尚无 SMI/LARB 状态恢复，使用明确的 ALWAYS_ON 策略；GPU 的 MFG 已在 #31 接入 100 ms runtime autosuspend：真实绘制回读后再次断电，两个熄屏/亮屏周期正常，SPM 双状态寄存器的 MFG 位清零。完整 PLL 父子关系和全部外设门控仍待补齐。
-- #30 GPU 断电试验导致黑屏、重启及 USB 枚举失败；#31 临时保留共享 MPLL_D5 后恢复。实机 SMI mux=9 使用 D5，USB mux=2 使用 UPLL_D16；需补齐共享父时钟后移除 D5 的 CLK_IS_CRITICAL。新 GPU PM 回调下的完整系统待机及长时压力尚未验证。
+- #30 GPU 断电试验导致黑屏、重启及 USB 枚举失败；#31 临时保留共享 MPLL_D5 后恢复。#32 已按固件 mux 接入 SMI、USB、MFG、MSDC0、PWM 父时钟与 D5→D10→D20→D40 引用链，D5 改用硬件 SET/CLR，并移除无条件 CLK_IS_CRITICAL。实机 SMI=MPLL/5，USB=UPLL/16，MFG=MPLL/3，MSDC0=UPLL/6；GPU 断电后 D5 由 SMI 保留一个正常引用。开机、GPU 绘制回读后再次断电、两轮熄屏亮屏通过，RDMA 欠流/异常均为 0，ADB 正常。已更新标准 boot/kernel 产物；记录在 `out/a1260-runtime-pm/clock-parents-validation.txt`。
+- #32 仍保留固件 PLL 频率和 mux，不是完整 PLL 驱动。I2C/APDMA 固定源、AUXADC/显示引擎父时钟和其他分频门控待完善；DISP 的 SMI/LARB 上下文恢复未实现，继续 ALWAYS_ON。新 GPU PM 回调下的完整系统待机及长时压力尚未验证。
 - MT6350 RTC 已接入最终关机回调，沿用 BSP 解锁、按用户状态处理 32 kHz 输出及 BBPU=0x4309 时序；PWRAP 改为原子轮询和自旋锁，避免最终断电阶段睡眠。电池供电关机/按键开机已实测：本地记录拔线后 3 秒请求 Android 正常关机，用户观察到关机并可按电源键开机；随后新一轮 #29 启动恢复 ADB、DSI 显示（欠流/异常为 0）、充电检测和温控，维护锁为空。插着充电器的关机行为及实际关机电流尚未验证。
 - USB 大传输问题按用户要求暂缓：当前使用 USB/IP，需之后具备直接 USB 连接时再定位。
 
