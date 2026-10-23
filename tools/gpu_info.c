@@ -5,10 +5,6 @@
 #include <GLES2/gl2.h>
 #include <stdio.h>
 
-#ifndef EGL_PLATFORM_SURFACELESS_MESA
-#define EGL_PLATFORM_SURFACELESS_MESA 0x31DD
-#endif
-
 static GLuint shader(GLenum type, const char *source)
 {
     GLuint result = glCreateShader(type);
@@ -28,13 +24,7 @@ static GLuint shader(GLenum type, const char *source)
 
 int main(void)
 {
-    PFNEGLGETPLATFORMDISPLAYEXTPROC get_display =
-        (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
-    if (!get_display) {
-        fprintf(stderr, "Surfaceless EGL unavailable\n");
-        return 1;
-    }
-    EGLDisplay display = get_display(EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, NULL);
+    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     EGLint major, minor, count;
     EGLConfig config;
     const EGLint attributes[] = {EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,

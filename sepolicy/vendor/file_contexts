@@ -1,4 +1,13 @@
 /vendor/bin/a1260-usb-setup    u:object_r:vendor_shell_exec:s0
+/vendor/lib/egl/.*    u:object_r:same_process_hal_file:s0
+/vendor/lib/liba1260_stock_.*\.so    u:object_r:same_process_hal_file:s0
+/vendor/lib/hw/gralloc\.minigbm\.so    u:object_r:same_process_hal_file:s0
+/vendor/lib/hw/mapper\.minigbm\.so    u:object_r:same_process_hal_file:s0
+/vendor/lib/libminigbm_gralloc\.so    u:object_r:same_process_hal_file:s0
+/vendor/lib/libminigbm_gralloc4_utils\.so    u:object_r:same_process_hal_file:s0
+/vendor/lib/libdrm\.so    u:object_r:same_process_hal_file:s0
+/dev/mali    u:object_r:gpu_device:s0
+/dev/dri(/.*)?    u:object_r:gpu_device:s0
 /vendor/bin/hw/android\.hardware\.composer\.hwc3-service\.drm    u:object_r:hal_graphics_composer_default_exec:s0
 /vendor/bin/hw/android\.hardware\.graphics\.allocator-service\.minigbm    u:object_r:hal_graphics_allocator_default_exec:s0
 /vendor/bin/hw/android\.hardware\.security\.keymint-service\.nonsecure    u:object_r:hal_keymint_default_exec:s0

@@ -19,7 +19,8 @@ $(call inherit-product, frameworks/native/build/phone-xhdpi-1024-dalvik-heap.mk)
 
 # Rebuild vendor interfaces from this source tree; legacy binary HALs are not
 # yet compatible with the mainline-style 6.18 hardware drivers.
-$(call soong_config_set,minigbm,platform,generic)
+$(call soong_config_set,minigbm,platform,mt6580-utgard)
+$(call inherit-product, vendor/aic/a1260/mali-vendor.mk)
 # Only this debug port opts into native ARM32 networking on Linux 6.18.
 $(call soong_config_set,aic_a1260,mt6580_arm32_kernel,true)
 PRODUCT_PACKAGES += \
@@ -27,9 +28,6 @@ PRODUCT_PACKAGES += \
     android.hardware.graphics.allocator-service.minigbm \
     mapper.minigbm \
     gralloc.minigbm \
-    libEGL_mesa \
-    libGLESv1_CM_mesa \
-    libGLESv2_mesa \
     a1260-gpu-info \
     vulkan.pastel \
     libEGL_angle \
@@ -57,7 +55,7 @@ PRODUCT_COPY_FILES += \
 PRODUCT_VENDOR_PROPERTIES += \
     ro.sf.lcd_density=240 \
     ro.hardware.gralloc=minigbm \
-    ro.hardware.egl=mesa \
+    ro.hardware.egl=mali \
     ro.hardware.vulkan=pastel \
     vendor.hwc.drm.device=/dev/dri/card% \
     ro.vendor.hwc.use_overlay_planes=false \

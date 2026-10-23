@@ -84,7 +84,8 @@ a 270000-byte read/SHA256 check. The full system image mounts successfully.
 ## Hardware status
 
 The kernel has tested USB CDC, eMMC and 480x800 JD9161 DRM scanout. The Android graphics stack uses drm_hwcomposer, minigbm KMS buffers and
-Mesa Lima GLES2. Physical boot animation and GPU rendering are verified.
+the original Mali r8p0 GLES2 stack described below. Physical boot animation,
+desktop, Settings and GPU drawing/readback are verified.
 Reference health/power services are used until PMIC/battery and CPU power
 management drivers are ready. No legacy vendor binary HAL is assumed compatible.
 Touch is verified; hardware audio and Wi-Fi remain unfinished.
@@ -142,7 +143,7 @@ software audio services, not physical microphone or speaker operation.
 
 USB ADB shell, reconnect and UID 0 shell are verified on hardware. The reference
 AIDL core/effect audio services register and audioserver remains running.
-System server reaches boot_completed; desktop rendering remains under investigation.
+System server reaches boot_completed; desktop and Settings rendering are verified.
 
 ART's shipped boot image uses CMC while a kernel without USERFAULTFD makes the
 runtime fall back to CC/read barriers. The kernel Android profile now enables
@@ -199,6 +200,10 @@ as a working desktop. The kernel increases the reusable display CMA pool to
 
 ## Lima GPU bring-up
 
+The Lima work below is the previous graphics configuration. The current product
+selects the proprietary r8p0 userspace and GPL Utgard kernel driver described
+in the following section; both kernel drivers must not be enabled together.
+
 The kernel now describes the Mali-400 at 0x13010000, its six interrupts, MFG
 power domain and clock gates using the MT6580 vendor platform/clock/power
 sources as reference. The top clock mux and supply voltages remain as firmware
@@ -246,6 +251,62 @@ wake lock keeps bring-up sessions usable. The user's explicit removal request,
 the exact command and the resume verification conditions are recorded in
 `TODO.md`; the lock must be removed once the wake path is repaired.
 
+
+## Original Mali r8p0 integration
+
+The product now selects `CONFIG_MALI400=y`, `CONFIG_DRM_LIMA=n`,
+`ro.hardware.egl=mali` and the minigbm `mt6580-utgard` platform. The original
+owner-supplied Android 8.1 blobs are packaged locally, with private SONAMEs and
+matching dependency names. Current Bionic, libc++, liblog and libvndksupport
+remain provided by Android 17. Proprietary binaries and device efuses are not
+part of this device repository.
+
+On a fresh source tree, apply the updated
+`patches/minigbm-mt6580-display-and-lima.patch` in `external/minigbm` (it includes
+the display, Lima and conditional Utgard changes), and
+`patches/drm-hwcomposer-mt6580-utgard.patch` in `external/drm_hwcomposer`.
+The latter selects this device's image-FD adapter only for `mt6580-utgard`.
+
+Prepare the local vendor package before building:
+
+    python3 device/aic/a1260/tools/prepare_stock_mali.py \
+        /path/to/extracted-stock-libraries vendor/aic/a1260 \
+        --patchelf /path/to/patchelf \
+        --devinfo-atag /path/to/same-device/device-tree/chosen/atag,devinfo
+
+The input directory contains `lib/*.so` and `lib/egl/libGLES_mali.so`. The ATAG
+must come from this device's original kernel backup. The script validates its
+length, tag, word count and MT6580 hardware code, then converts the original
+binary data to the legacy count-plus-efuse format. It adapts the private
+`libmtk_drvb` filename to `/vendor/etc/mt6580-devinfo.bin`; it does not replace
+validation functions or force successful results. Without this real input the
+original helper returns `0x1004`, then the blob deliberately writes
+`0xddeeaadd` beyond its stack frame, causing unrelated-looking EGL, JNI and
+stack-canary crashes. The missing legacy sysfs input was confirmed by runtime
+logs and an LLDB breakpoint in `drvb_error`.
+
+The minigbm bridge keeps modern mapper metadata but uses the exact 168-byte
+original ARM32 RGB handle layout: two FDs, 37 integers, metadata FD first and
+image DMA-BUF second. KMS/CMA allocation remains linear and contiguous. Each
+process maps its own CPU address after importing a handle; a pointer received
+through Binder is never reused directly. The HWC metadata path selects the
+image FD, and legacy gralloc CPU lock/unlock performs real DMA-BUF cache sync.
+The profile supports one plane and the RGB/R8 formats implemented by this
+bridge; multi-plane YUV, FP16 and protected buffers are not implemented.
+
+Applications need the KMS primary node for this in-process mapper, because
+Utgard exposes `/dev/mali` instead of a DRM render node. The bring-up ueventd
+rules therefore allow access to both `/dev/mali` and `/dev/dri/card0`.
+The independent native checks completed shader compilation, drawing/readback,
+KMS DMA-BUF import and native fence completion. After the devinfo input was
+restored and the kernel fence ordering/lifetime defects were corrected,
+Android's boot animation, lock screen, Launcher and Settings rendered with
+`GLES: ARM, Mali-400 MP, OpenGL ES 2.0 58bf738` and advancing GP/PP interrupts.
+The normal built-in-driver kernel (#8, `CONFIG_DEBUG_SPINLOCK=n`) reaches boot
+completion on four CPUs and passes GPU draw/readback and Settings/Home
+switching. An earlier boot's RCU stall was not conclusively diagnosed; longer
+runtime, memory pressure and broader application compatibility remain tracked
+in `TODO.md`. Fixed firmware clocks and the temporary bring-up wake lock remain.
 
 ## FT6336U touch
 

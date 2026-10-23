@@ -1,3 +1,15 @@
+diff --git a/Android.bp b/Android.bp
+index 71e6c62..e9a5495 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -104,6 +104,7 @@ cc_defaults {
+         "intel": intel_cflags,
+         "meson": meson_cflags,
+         "msm": msm_cflags,
++        "mt6580-utgard": generic_cflags + ["-DMT6580_UTGARD_HANDLE"],
+         "mt8186": mediatek_cflags + ["-DMTK_MT8186"],
+         "mt8188": mediatek_cflags + ["-DMTK_MT8188G"],
+         "mt8196": mediatek_cflags + ["-DMTK_MT8196"],
 diff --git a/cros_gralloc/aidl/Allocator.cpp b/cros_gralloc/aidl/Allocator.cpp
 index 1500892..444806b 100644
 --- a/cros_gralloc/aidl/Allocator.cpp
@@ -11,11 +23,43 @@ index 1500892..444806b 100644
      return mDriver != nullptr;
  }
  
+diff --git a/cros_gralloc/cros_gralloc_buffer.cc b/cros_gralloc/cros_gralloc_buffer.cc
+index c738830..90b059c 100644
+--- a/cros_gralloc/cros_gralloc_buffer.cc
++++ b/cros_gralloc/cros_gralloc_buffer.cc
+@@ -153,7 +153,7 @@ int64_t cros_gralloc_buffer::get_plane_fd(uint32_t plane) const
+ 	if (plane >= hnd_->num_planes) {
+ 		return -1;
+ 	}
+-	return hnd_->fds[plane];
++	return hnd_->fds[cros_gralloc_plane_fd_index(plane)];
+ }
+ 
+ int32_t cros_gralloc_buffer::get_android_format() const
+@@ -441,7 +441,7 @@ int32_t cros_gralloc_buffer::flush()
+ 
+ int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size) const
+ {
+-	int32_t reserved_region_fd = hnd_->fds[hnd_->num_planes];
++	int32_t reserved_region_fd = hnd_->fds[cros_gralloc_metadata_fd_index(hnd_)];
+ 	if (reserved_region_fd < 0) {
+ 		ALOGE("Buffer does not have reserved region.");
+ 		return -EINVAL;
 diff --git a/cros_gralloc/cros_gralloc_driver.cc b/cros_gralloc/cros_gralloc_driver.cc
-index 706dee9..84ad7f8 100644
+index 706dee9..170034e 100644
 --- a/cros_gralloc/cros_gralloc_driver.cc
 +++ b/cros_gralloc/cros_gralloc_driver.cc
-@@ -82,19 +82,31 @@ int memfd_create_reserved_region(const std::string &buffer_name, uint64_t reserv
+@@ -12,6 +12,9 @@
+ #include <hardware/gralloc.h>
+ #include <sys/mman.h>
+ #include <syscall.h>
++#include <linux/dma-buf.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
+ #include <xf86drm.h>
+ 
+ #include "../drv_helpers.h"
+@@ -82,19 +85,31 @@ int memfd_create_reserved_region(const std::string &buffer_name, uint64_t reserv
  
  std::shared_ptr<cros_gralloc_driver> cros_gralloc_driver::get_instance()
  {
@@ -53,7 +97,7 @@ index 706dee9..84ad7f8 100644
  {
  	int fd;
  	char *node;
-@@ -110,13 +122,31 @@ static struct driver *init_try_node(int idx, char const *str)
+@@ -110,13 +125,31 @@ static struct driver *init_try_node(int idx, char const *str)
  		return NULL;
  
  	drv = drv_create(fd, NULL);
@@ -64,7 +108,7 @@ index 706dee9..84ad7f8 100644
 +		drv = nullptr;
 +	}
 +	if (!drv) {
- 		close(fd);
++		close(fd);
 +		return NULL;
 +	}
 +
@@ -75,7 +119,7 @@ index 706dee9..84ad7f8 100644
 +	if (drmIsMaster(fd) && drmDropMaster(fd)) {
 +		ALOGE("Failed to release allocation device DRM master: %s", strerror(errno));
 +		drv_destroy(drv);
-+		close(fd);
+ 		close(fd);
 +		return NULL;
 +	}
  
@@ -87,7 +131,7 @@ index 706dee9..84ad7f8 100644
  {
  	/*
  	 * Create a driver from render nodes first, then try card
-@@ -136,14 +166,14 @@ static struct driver *init_try_nodes()
+@@ -136,14 +169,14 @@ static struct driver *init_try_nodes()
  
  	// Try render nodes...
  	for (uint32_t i = min_render_node; i < max_render_node; i++) {
@@ -104,7 +148,7 @@ index 706dee9..84ad7f8 100644
  		if (drv)
  			return drv;
  	}
-@@ -167,8 +197,8 @@ static bool is_running_with_software_rendering()
+@@ -167,8 +200,8 @@ static bool is_running_with_software_rendering()
  					     strstr(vulkan_driver, "pastel") != nullptr));
  }
  
@@ -115,8 +159,260 @@ index 706dee9..84ad7f8 100644
        is_running_with_software_rendering_(is_running_with_software_rendering())
  {
  }
+@@ -215,6 +248,17 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
+ 		resolved_use_flags |= BO_USE_LINEAR;
+ 		combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
+ 	}
++#ifdef MT6580_UTGARD_HANDLE
++ /* The old RGB Mali platform ABI has no multi-plane/FP16 representation. */
++ switch (resolved_format) {
++ case DRM_FORMAT_ABGR8888: case DRM_FORMAT_XBGR8888:
++ case DRM_FORMAT_ARGB8888: case DRM_FORMAT_XRGB8888:
++ case DRM_FORMAT_RGB565: case DRM_FORMAT_BGR888: case DRM_FORMAT_R8:
++  break;
++ default: return false;
++ }
++ if (!descriptor->enable_metadata_fd) return false;
++#endif
+ 	if (!combo)
+ 		return false;
+ 
+@@ -270,6 +314,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 	struct bo *bo;
+ 	struct cros_gralloc_handle *hnd;
+ 	std::unique_ptr<cros_gralloc_buffer> buffer;
++#ifdef MT6580_UTGARD_HANDLE
++ std::shared_ptr<void> stock_mapping;
++#endif
+ 
+ 	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
+ 		ALOGE("Failed to resolve format and use_flags.");
+@@ -284,6 +331,19 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 	}
+ 
+ 	num_planes = drv_bo_get_num_planes(bo);
++#ifdef MT6580_UTGARD_HANDLE
++ if (num_planes != 1 || drv_bo_get_format_modifier(bo) != 0 ||
++     drv_bo_get_plane_offset(bo, 0) != 0 ||
++     !drv_bo_get_plane_stride(bo, 0) ||
++     drv_bo_get_total_size(bo) > UINT32_MAX) {
++  drv_bo_destroy(bo);
++  return -ENOTSUP;
++ }
++ if (!descriptor->enable_metadata_fd) {
++  drv_bo_destroy(bo);
++  return -ENOTSUP;
++ }
++#endif
+ 	num_fds = num_planes;
+ 
+ 	if (descriptor->enable_metadata_fd)
+@@ -295,7 +355,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 	hnd =
+ 	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_create(num_fds, num_ints));
+ 
+-	for (size_t i = 0; i < DRV_MAX_FDS; i++)
++	memset(reinterpret_cast<char *>(hnd) + sizeof(native_handle_t), 0,
++	       sizeof(*hnd) - sizeof(native_handle_t));
++	for (size_t i = 0; i < num_fds; i++)
+ 		hnd->fds[i] = -1;
+ 
+ 	hnd->num_planes = num_planes;
+@@ -304,7 +366,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 		if (ret < 0)
+ 			goto destroy_hnd;
+ 
+-		hnd->fds[plane] = ret;
++		hnd->fds[cros_gralloc_plane_fd_index(plane)] = ret;
+ 		hnd->strides[plane] = drv_bo_get_plane_stride(bo, plane);
+ 		hnd->offsets[plane] = drv_bo_get_plane_offset(bo, plane);
+ 		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
+@@ -318,7 +380,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 		if (ret < 0)
+ 			goto destroy_hnd;
+ 
+-		hnd->fds[hnd->num_planes] = ret;
++		hnd->fds[cros_gralloc_metadata_fd_index(hnd)] = ret;
+ 	}
+ 
+ 	static std::atomic<uint32_t> next_buffer_id{ 1 };
+@@ -335,6 +397,41 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 	hnd->droid_format = descriptor->droid_format;
+ 	hnd->usage = descriptor->droid_usage;
+ 	hnd->total_size = hnd->reserved_region_size + drv_bo_get_total_size(bo);
++#ifdef MT6580_UTGARD_HANDLE
++ hnd->stock_magic = 0x03141592;
++ hnd->stock_flags = 4;
++ hnd->stock_usage = descriptor->droid_usage;
++ hnd->stock_producer_usage = descriptor->droid_usage;
++ /* A dumb BO can have rows padded beyond logical height (tile alignment).
++  * Exported size is the real DMA-BUF allocation, including kernel padding;
++  * never describe that padding as another visible screen row. */
++ hnd->sizes[0] = drv_bo_get_total_size(bo);
++ hnd->stock_size = hnd->sizes[0];
++ hnd->stock_allocation_height = hnd->sizes[0] / hnd->strides[0];
++ hnd->stock_width = hnd->width;
++ hnd->stock_height = hnd->height;
++ switch (hnd->format) {
++ case DRM_FORMAT_ABGR8888: hnd->stock_format = HAL_PIXEL_FORMAT_RGBA_8888; break;
++ case DRM_FORMAT_XBGR8888: hnd->stock_format = HAL_PIXEL_FORMAT_RGBX_8888; break;
++ case DRM_FORMAT_ARGB8888: hnd->stock_format = HAL_PIXEL_FORMAT_BGRA_8888; break;
++ case DRM_FORMAT_XRGB8888: hnd->stock_format = HAL_PIXEL_FORMAT_BGRA_8888; break;
++ case DRM_FORMAT_RGB565: hnd->stock_format = HAL_PIXEL_FORMAT_RGB_565; break;
++ case DRM_FORMAT_BGR888: hnd->stock_format = HAL_PIXEL_FORMAT_RGB_888; break;
++ default: hnd->stock_format = hnd->droid_format; break;
++ }
++ hnd->stock_pixel_stride = hnd->pixel_stride;
++ hnd->stock_lock_state = 0x40000000;
++ {
++  void *address = mmap(nullptr, hnd->sizes[0], PROT_READ | PROT_WRITE, MAP_SHARED,
++                       hnd->fds[1], 0);
++  if (address == MAP_FAILED) { ret = -errno; goto destroy_hnd; }
++  stock_mapping = std::shared_ptr<void>(address, [size = hnd->sizes[0]](void *p) {
++   munmap(p, size);
++  });
++  hnd->stock_cpu_base = reinterpret_cast<uintptr_t>(address);
++  hnd->stock_pid = getpid();
++ }
++#endif
+ 
+ 	buffer = cros_gralloc_buffer::create(bo, hnd);
+ 	if (!buffer) {
+@@ -358,6 +455,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 			.buffer = buffer.get(),
+ 			.refcount = 1,
+ 		};
++#ifdef MT6580_UTGARD_HANDLE
++  hnd_info.stock_mapping = std::move(stock_mapping);
++#endif
+ 		handles_.emplace(hnd, hnd_info);
+ 		buffers_.emplace(hnd->id, std::move(buffer));
+ 	}
+@@ -400,6 +500,17 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
+ 		return 0;
+ 	}
+ 
++#ifdef MT6580_UTGARD_HANDLE
++ /* Never trust producer virtual addresses/PIDs carried over Binder. This
++  * mapping belongs to this imported native_handle and its retain lifetime. */
++ void *stock_addr = mmap(nullptr, hnd->sizes[0], PROT_READ | PROT_WRITE,
++                         MAP_SHARED, hnd->fds[1], 0);
++ if (stock_addr == MAP_FAILED)
++  return -errno;
++ std::shared_ptr<void> stock_mapping(stock_addr, [size = hnd->sizes[0]](void *p) {
++  munmap(p, size);
++ });
++#endif
+ 	uint32_t id = hnd->id;
+ 
+ 	cros_gralloc_buffer *buffer = nullptr;
+@@ -423,9 +534,11 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
+ 			.tiling = hnd->tiling,
+ 			.use_flags = hnd->use_flags,
+ 		};
+-		memcpy(data.fds, hnd->fds, sizeof(data.fds));
+-		memcpy(data.strides, hnd->strides, sizeof(data.strides));
+-		memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
++		for (uint32_t plane = 0; plane < hnd->num_planes; plane++) {
++   data.fds[plane] = hnd->fds[cros_gralloc_plane_fd_index(plane)];
++   data.strides[plane] = hnd->strides[plane];
++   data.offsets[plane] = hnd->offsets[plane];
++  }
+ 
+ 		struct bo *bo = drv_bo_import(drv_.get(), &data);
+ 		if (!bo)
+@@ -444,6 +557,14 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
+ 		.buffer = buffer,
+ 		.refcount = 1,
+ 	};
++#ifdef MT6580_UTGARD_HANDLE
++ hnd_info.stock_mapping = std::move(stock_mapping);
++ auto mutable_hnd = const_cast<cros_gralloc_handle *>(hnd);
++ mutable_hnd->stock_cpu_base = reinterpret_cast<uintptr_t>(stock_addr);
++ mutable_hnd->stock_pid = getpid();
++ mutable_hnd->stock_lock_state = 0x40000000;
++ mutable_hnd->stock_write_usage = 0;
++#endif
+ 	handles_.emplace(hnd, hnd_info);
+ 	return 0;
+ }
+@@ -464,8 +585,25 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!--handles_[hnd].refcount)
++	if (!--handles_[hnd].refcount) {
++#ifdef MT6580_UTGARD_HANDLE
++  auto &info = handles_[hnd];
++  if (info.legacy_sync_flags) {
++   struct dma_buf_sync sync = { .flags = info.legacy_sync_flags | DMA_BUF_SYNC_END };
++   if (ioctl(hnd->fds[1], DMA_BUF_IOCTL_SYNC, &sync)) {
++    /* release must finish cleanup: the mapper closes/deletes its native
++     * handle only when this succeeds. Report the real sync failure in logs
++     * instead of leaving a dead imported handle and its FDs behind. */
++    ALOGE("Final release: DMA_BUF_SYNC_END failed: %s; releasing handle anyway",
++          strerror(errno));
++   }
++  }
++  auto mutable_hnd = const_cast<cros_gralloc_handle *>(hnd);
++  mutable_hnd->stock_cpu_base = 0;
++  mutable_hnd->stock_pid = 0;
++#endif
+ 		handles_.erase(hnd);
++ }
+ 
+ 	if (buffer->decrease_refcount() == 0) {
+ 		buffers_.erase(buffer->get_id());
+@@ -655,3 +793,47 @@ void cros_gralloc_driver::with_each_buffer(
+ 	for (const auto &pair : buffers_)
+ 		function(pair.second.get());
+ }
++
++#ifdef MT6580_UTGARD_HANDLE
++/* Old Mali uses gralloc0 lock for GPU access as well as CPU access. Modern
++ * IMapper lock keeps its original CPU-only contract above. */
++int32_t cros_gralloc_driver::legacy_lock(buffer_handle_t handle, uint32_t flags, void **address)
++{
++ std::lock_guard<std::mutex> lock(mutex_);
++ auto hnd = cros_gralloc_convert_handle(handle);
++ auto it = handles_.find(hnd);
++ if (!hnd || it == handles_.end() || !it->second.stock_mapping || !address)
++  return -EINVAL;
++ auto &info = it->second;
++ if (info.legacy_locked)
++  return -EBUSY;
++ uint64_t sync_flags = 0;
++ if (flags & BO_MAP_READ) sync_flags |= DMA_BUF_SYNC_READ;
++ if (flags & BO_MAP_WRITE) sync_flags |= DMA_BUF_SYNC_WRITE;
++ if (sync_flags) {
++  struct dma_buf_sync sync = { .flags = sync_flags | DMA_BUF_SYNC_START };
++  if (ioctl(hnd->fds[1], DMA_BUF_IOCTL_SYNC, &sync)) return -errno;
++ }
++ info.legacy_sync_flags = sync_flags;
++ info.legacy_locked = true;
++ *address = info.stock_mapping.get();
++ return 0;
++}
++
++int32_t cros_gralloc_driver::legacy_unlock(buffer_handle_t handle)
++{
++ std::lock_guard<std::mutex> lock(mutex_);
++ auto hnd = cros_gralloc_convert_handle(handle);
++ auto it = handles_.find(hnd);
++ if (!hnd || it == handles_.end() || !it->second.legacy_locked)
++  return -EINVAL;
++ auto &info = it->second;
++ if (info.legacy_sync_flags) {
++  struct dma_buf_sync sync = { .flags = info.legacy_sync_flags | DMA_BUF_SYNC_END };
++  if (ioctl(hnd->fds[1], DMA_BUF_IOCTL_SYNC, &sync)) return -errno;
++ }
++ info.legacy_locked = false;
++ info.legacy_sync_flags = 0;
++ return 0;
++}
++#endif
 diff --git a/cros_gralloc/cros_gralloc_driver.h b/cros_gralloc/cros_gralloc_driver.h
-index 4e1fdf2..58af06a 100644
+index 4e1fdf2..b3c64f4 100644
 --- a/cros_gralloc/cros_gralloc_driver.h
 +++ b/cros_gralloc/cros_gralloc_driver.h
 @@ -25,6 +25,7 @@ class cros_gralloc_driver
@@ -127,7 +423,18 @@ index 4e1fdf2..58af06a 100644
  	bool is_supported(const struct cros_gralloc_buffer_descriptor *descriptor);
  	int32_t allocate(const struct cros_gralloc_buffer_descriptor *descriptor,
  			 native_handle_t **out_handle);
-@@ -51,7 +52,8 @@ class cros_gralloc_driver
+@@ -36,6 +37,10 @@ class cros_gralloc_driver
+ 		     const struct rectangle *rect, uint32_t map_flags,
+ 		     uint8_t *addr[DRV_MAX_PLANES]);
+ 	int32_t unlock(buffer_handle_t handle, int32_t *release_fence);
++#ifdef MT6580_UTGARD_HANDLE
++ int32_t legacy_lock(buffer_handle_t handle, uint32_t map_flags, void **address);
++ int32_t legacy_unlock(buffer_handle_t handle);
++#endif
+ 
+ 	int32_t invalidate(buffer_handle_t handle);
+ 	int32_t flush(buffer_handle_t handle);
+@@ -51,7 +56,8 @@ class cros_gralloc_driver
  	void with_each_buffer(const std::function<void(cros_gralloc_buffer *)> &function);
  
        private:
@@ -137,8 +444,124 @@ index 4e1fdf2..58af06a 100644
  	bool is_initialized();
  	cros_gralloc_buffer *get_buffer(cros_gralloc_handle_t hnd);
  	bool
+@@ -76,6 +82,11 @@ class cros_gralloc_driver
+ 
+ 		/* The handle's refcount as a handle can be imported multiple times.*/
+ 		int32_t refcount = 1;
++#ifdef MT6580_UTGARD_HANDLE
++  std::shared_ptr<void> stock_mapping;
++  uint64_t legacy_sync_flags = 0;
++  bool legacy_locked = false;
++#endif
+ 	};
+ 
+ 	std::mutex mutex_;
+diff --git a/cros_gralloc/cros_gralloc_handle.h b/cros_gralloc/cros_gralloc_handle.h
+index 167972e..8417fe8 100644
+--- a/cros_gralloc/cros_gralloc_handle.h
++++ b/cros_gralloc/cros_gralloc_handle.h
+@@ -8,11 +8,40 @@
+ #define CROS_GRALLOC_HANDLE_H
+ 
+ #include <cstdint>
++#include <cstddef>
+ #include <cutils/native_handle.h>
+ 
+ #define DRV_MAX_PLANES 4
+ #define DRV_MAX_FDS (DRV_MAX_PLANES + 1)
+ 
++#ifdef MT6580_UTGARD_HANDLE
++/* Exact stock ARM32 wire ABI. No native pointers may be trusted after IPC.
++ * One image plane only: the array views overlap stock geometry/usage words.
++ * Never copy full array views; import only the validated num_planes entries.
++ */
++struct cros_gralloc_handle : public native_handle_t {
++ int32_t fds[2]; /* fd0: modern metadata; fd1: image DMA-BUF */
++ union {
++  uint32_t strides[4];
++  struct { uint32_t _stride; uint32_t offsets[4]; };
++  struct { uint32_t _geometry_pad[2]; uint32_t width, height; int32_t droid_format;
++           uint32_t pixel_stride, stock_allocation_height, id, tiling; };
++ };
++ union {
++  uint32_t sizes[4];
++  struct { uint32_t _size; uint32_t num_planes; int64_t usage; uint64_t stock_producer_usage; };
++ };
++ uint32_t stock_magic, stock_flags, stock_usage, stock_size;
++ uint32_t stock_width, stock_height, stock_format, stock_pixel_stride;
++ uint32_t stock_cpu_base, format, stock_lock_state, stock_write_usage;
++ int32_t stock_pid;
++ uint32_t magic;
++ uint64_t format_modifier, use_flags, reserved_region_size, total_size;
++} __attribute__((packed));
++static_assert(sizeof(cros_gralloc_handle) == 168, "Mali stock handle ABI");
++/* GCC/Clang warn offsetof on native_handle inheritance; the fixed wire layout
++ * is additionally checked by the standalone layout verification program. */
++#else
+ struct cros_gralloc_handle : public native_handle_t {
+ 	/*
+ 	 * File descriptors must immediately follow the native_handle_t base and used file
+@@ -42,6 +71,23 @@ struct cros_gralloc_handle : public native_handle_t {
+ 	uint64_t total_size; /* Total allocation size */
+ } __attribute__((packed));
+ 
++#endif
++
+ typedef const struct cros_gralloc_handle *cros_gralloc_handle_t;
++static inline uint32_t cros_gralloc_plane_fd_index(uint32_t plane) {
++#ifdef MT6580_UTGARD_HANDLE
++ return plane + 1;
++#else
++ return plane;
++#endif
++}
++static inline uint32_t cros_gralloc_metadata_fd_index(cros_gralloc_handle_t hnd) {
++#ifdef MT6580_UTGARD_HANDLE
++ (void)hnd;
++ return 0;
++#else
++ return hnd->num_planes;
++#endif
++}
+ 
+ #endif
+diff --git a/cros_gralloc/cros_gralloc_helpers.cc b/cros_gralloc/cros_gralloc_helpers.cc
+index b18277c..411be3c 100644
+--- a/cros_gralloc/cros_gralloc_helpers.cc
++++ b/cros_gralloc/cros_gralloc_helpers.cc
+@@ -185,6 +185,9 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage)
+ 
+ cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
+ {
++	if (!handle || handle->version != sizeof(native_handle_t))
++		return nullptr;
++
+ 	if (sizeof(native_handle_t) + (sizeof(int) * (handle->numFds + handle->numInts)) !=
+ 	    sizeof(struct cros_gralloc_handle))
+ 		return nullptr;
+@@ -193,11 +196,20 @@ cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
+ 	if (!hnd || hnd->magic != cros_gralloc_magic)
+ 		return nullptr;
+ 
++#ifdef MT6580_UTGARD_HANDLE
++ if (hnd->numFds != 2 || hnd->numInts != 37 || hnd->num_planes != 1 ||
++     !hnd->reserved_region_size || hnd->fds[0] < 0 || hnd->fds[1] < 0 ||
++     hnd->stock_magic != 0x03141592 || hnd->stock_flags != 4 ||
++     hnd->format_modifier != 0 || !hnd->sizes[0] || hnd->offsets[0] != 0)
++  return nullptr;
++#else
+ 	// if hnd->reserved_region_size == 0, handle->numFds is hnd->num_planes
+ 	// if hnd->reserved_region_size > 0, handle->numFds is hnd->num_planes + 1
+ 	if ((uint32_t)handle->numFds != hnd->num_planes + (hnd->reserved_region_size > 0))
+ 		return nullptr;
+ 
++#endif
++
+ 	return hnd;
+ }
+ 
 diff --git a/cros_gralloc/gralloc0/gralloc0.cc b/cros_gralloc/gralloc0/gralloc0.cc
-index 8f97b21..c7de42a 100644
+index 8f97b21..f307dcc 100644
 --- a/cros_gralloc/gralloc0/gralloc0.cc
 +++ b/cros_gralloc/gralloc0/gralloc0.cc
 @@ -146,7 +146,8 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
@@ -151,6 +574,70 @@ index 8f97b21..c7de42a 100644
  	if (!mod->driver)
  		return -ENODEV;
  
+@@ -235,8 +236,7 @@ static int gralloc0_unlock(struct gralloc_module_t const *module, buffer_handle_
+ 		return -EINVAL;
+ 	}
+ 
+-	auto mod = (struct gralloc0_module const *)module;
+-	ret = mod->driver->unlock(handle, &fence_fd);
++	ret = module->unlockAsync(module, handle, &fence_fd);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -336,7 +336,7 @@ static int gralloc0_perform(struct gralloc_module_t const *module, int op, ...)
+ 		info->drm_fourcc = drv_get_standard_fourcc(hnd->format);
+ 		info->num_fds = hnd->num_planes;
+ 		for (int i = 0; i < info->num_fds; i++)
+-			info->fds[i] = hnd->fds[i];
++			info->fds[i] = hnd->fds[cros_gralloc_plane_fd_index(i)];
+ 
+ 		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
+ 		if (ret)
+@@ -394,10 +394,10 @@ static int gralloc0_lock_async(struct gralloc_module_t const *module, buffer_han
+ {
+ 	int32_t ret;
+ 	uint32_t map_flags;
+-	uint8_t *addr[DRV_MAX_PLANES];
++	[[maybe_unused]] uint8_t *addr[DRV_MAX_PLANES];
+ 	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
+ 	auto mod = const_cast<struct gralloc0_module *>(const_module);
+-	struct rectangle rect = { .x = static_cast<uint32_t>(l),
++	[[maybe_unused]] struct rectangle rect = { .x = static_cast<uint32_t>(l),
+ 				  .y = static_cast<uint32_t>(t),
+ 				  .width = static_cast<uint32_t>(w),
+ 				  .height = static_cast<uint32_t>(h) };
+@@ -429,9 +429,15 @@ static int gralloc0_lock_async(struct gralloc_module_t const *module, buffer_han
+ 	assert(h >= 0);
+ 
+ 	map_flags = cros_gralloc_convert_map_usage(static_cast<uint64_t>(usage));
++#ifdef MT6580_UTGARD_HANDLE
++ ret = cros_gralloc_sync_wait(fence_fd, true);
++ if (ret) return ret;
++ return mod->driver->legacy_lock(handle, map_flags, vaddr);
++#else
+ 	ret = mod->driver->lock(handle, fence_fd, true, &rect, map_flags, addr);
+ 	*vaddr = addr[0];
+ 	return ret;
++#endif
+ }
+ 
+ static int gralloc0_unlock_async(struct gralloc_module_t const *module, buffer_handle_t handle,
+@@ -444,7 +450,15 @@ static int gralloc0_unlock_async(struct gralloc_module_t const *module, buffer_h
+ 		return -EINVAL;
+ 	}
+ 
++#ifdef MT6580_UTGARD_HANDLE
++ if (fence_fd) *fence_fd = -1;
++ /* Old Mali calls unlock even when its preceding lock failed. */
++ if (!mod || !mod->initialized || !mod->driver)
++  return -ENODEV;
++ return mod->driver->legacy_unlock(handle);
++#else
+ 	return mod->driver->unlock(handle, fence_fd);
++#endif
+ }
+ 
+ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buffer_handle_t handle,
 diff --git a/cros_gralloc/gralloc4/CrosGralloc4Allocator.cc b/cros_gralloc/gralloc4/CrosGralloc4Allocator.cc
 index 852df88..59ebff6 100644
 --- a/cros_gralloc/gralloc4/CrosGralloc4Allocator.cc

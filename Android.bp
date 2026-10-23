@@ -13,6 +13,12 @@ cc_binary {
     vendor: true,
     srcs: ["tools/gpu_info.c"],
     header_libs: ["gl_headers"],
-    shared_libs: ["libEGL_mesa", "libGLESv2_mesa"],
+    shared_libs: ["libEGL", "libGLESv2"],
     cflags: ["-Wall", "-Werror"],
+}
+
+filegroup {
+    name: "a1260-utgard-hwc-fds",
+    srcs: ["graphics/hwc_utgard_fds.cpp"],
+    visibility: ["//external/drm_hwcomposer:__pkg__"],
 }

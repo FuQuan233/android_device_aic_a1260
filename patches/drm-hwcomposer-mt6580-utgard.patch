@@ -1,0 +1,16 @@
+diff --git a/Android.bp b/Android.bp
+index 4183e34..c906230 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -210,7 +210,10 @@ cc_binary {
+         "sdm_backend",
+     ],
+ 
+-    srcs: ["bufferinfo/legacy/BufferInfoLibdrm.cpp"],
++    srcs: ["bufferinfo/legacy/BufferInfoLibdrm.cpp"] + select(soong_config_variable("minigbm", "platform"), {
++        "mt6580-utgard": ["//device/aic/a1260:a1260-utgard-hwc-fds"],
++        default: [],
++    }),
+ 
+     relative_install_path: "hw",
+     vendor: true,

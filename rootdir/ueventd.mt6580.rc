@@ -1,5 +1,8 @@
-/dev/dri/card*             0660 system graphics
+# The Utgard GPU has /dev/mali; the in-process mapper imports CMA buffers on
+# the KMS primary node because there is no separate DRM GPU render node.
+/dev/dri/card*             0666 system graphics
 /dev/dri/renderD*          0666 system graphics
+/dev/mali                  0666 system graphics
 /dev/dma_heap/system       0660 system graphics
 /dev/watchdog              0600 root root
 /dev/watchdog0             0600 root root
