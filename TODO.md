@@ -3,8 +3,8 @@
 ## 后续执行顺序（2026-10-24，用户确认）
 
 1. **基础接管已验证，保留未决项：PMIC 供电轨**。#42 接入 VUSB/VEMC/VIO18/VIO28，USB PHY 引用真实 VUSB，eMMC 引用真实 VEMC。实机 VEMC=3.3 V，已修正原占位 3.0 V；启动、4 MiB fsync/read 和显示开关通过。屏幕及触摸 I/O 实际接线尚无足够证据：正常内核的屏幕供电回调为空，保留显式 placeholder/dummy；共享 VIO18/VIO28 和 VEMC 暂保持常开，不凭猜测切断。
-2. **进行中：USB 休眠恢复**。#42 已复现熄屏重启 adbd 后 ADB 无法重新枚举；复现脚本预设 RTC +15 秒，在设备本地 `/data/local/tmp/usb-sleep-repro-42.log` 保存前后状态，需恢复连接后取回，不能断言 RTC 或控制器恢复结果。脚本为短时测试，结束释放 a1260-usb-repro 锁并恢复自动熄屏；当前等待用户短按电源键并拔插 USB 恢复现场。USB 大传输仍按用户要求暂缓。
-3. **待做：完整时钟树**。补齐 MPLL/UPLL、分频门控、DSI 父级和 RDMA 时钟；消费者引用接齐后处理 PLL 关断。
+2. **重绑定竞态已修复并验证：USB 休眠恢复**。#42 日志表明 adbd 重启后新 FunctionFS 初始化反复被冻结：系统挂起成功 6 次、失败 0 次，一条 init 动作耗时约 60 秒。短暂保留 5 秒唤醒保护能恢复枚举。#45 将设备模式 gadget 启停的限时交接接入独立唤醒源；RESET/RESUME 转交正常连接锁，未连接时最多 5 秒自动到期。原生熄屏重启 adbd 已自动恢复 configured；USB 配置 none 时实测 5014 ms 到期、s2idle/RTC 成功 1 次失败 0 次，恢复 adb 后自动枚举。临时锁已释放、插电保持亮屏为 0；标准 boot/kernel 更新为 #45。主机主动 bus suspend/remote wake、PHY 深省电仍待后续整机 PM 工作，USB 大传输继续暂缓。
+3. **进行中：完整时钟树**。#46 已把 MAINPLL/UNIVPLL 从固定频率改为 APMIXEDSYS 寄存器读回，并通过 DT 明确 TOPCKGEN 依赖；实机为 1501.5/1248 MHz，Android 启动、Mali 绘制回读、DISP/MFG 熄屏断电及亮屏零欠流通过。#47 补齐 UPLL 分频关系和 PWRAP 的 SPI/26M 门控引用，在首次 WACS2 读取前启用，保留至最终关机；实机 PMIC SPI mux=3、26 MHz，并未使用 USB 的 UPLL_D16（该共享只存在于其他 mux 选择）。启动、电池/温度/PMIC 寄存器读取、一次 s2idle 成功/零失败及 PMIC IRQ 唤醒、ADB 自动重枚举和亮屏零欠流通过。标准 boot/kernel 已更新为 #47；临时锁、RTC alarm 已清理，插电保持亮屏仍为 0。后续继续核对未接管消费者及分频门控，DSI 父级和 RDMA AO 语义待查；PLL 供电及调频仍保留固件设置。
 4. **待做：eMMC 时钟和引脚**。接管固件 pinctrl、VEMC 和时钟配置，之后再验证提速；当前 legacy、实际约 17.3 MHz。
 5. **待做：整机待机回归**。在新 GPU/DISP/PMIC 驱动下验证挂起、RTC/按键唤醒和 USB 恢复。
 6. **待做：深度睡眠与 GPU 变频**。SPM/PCM、DDR 自刷新、集群断电；GPU OPP/devfreq 与供电约束。
