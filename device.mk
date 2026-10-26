@@ -13,6 +13,7 @@ USE_SOONG_DEFINED_SYSTEM_IMAGE := false
 PRODUCT_AAPT_CONFIG := normal hdpi
 PRODUCT_AAPT_PREF_CONFIG := hdpi
 PRODUCT_SOONG_NAMESPACES += $(LOCAL_PATH)
+DEVICE_PACKAGE_OVERLAYS += $(LOCAL_PATH)/overlay
 
 # Standard 1 GiB heap profile; avoid ART falling back to a 16 MiB heap.
 $(call inherit-product, frameworks/native/build/phone-xhdpi-1024-dalvik-heap.mk)

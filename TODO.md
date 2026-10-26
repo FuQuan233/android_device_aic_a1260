@@ -34,6 +34,7 @@
 
 25. **标准 deep 与独立插线恢复已通过，已设为默认（#108/#110）**。mem/deep 自动选择 CPU0/L2/infra/DDRPHY 掉电及 R0/APSRC/F26M 交接，不读取或改写显式 standby 的测试开关；前置条件 -EBUSY 且未进 WFI、回滚成功时可退回保留供电，真实恢复错误不回退。#108 两轮 deep 冷恢复、普通 s2idle 和插电脑的安全回退通过；16 MiB RAM、存储/GPU/显示正常。第一次物理循环误触电源键，不计独立插线唤醒，未插拔轮也不计。之后不按电源键的物理循环新增 cold/erratum=4/4，停钟 53.164046 秒、补时 53.165692 秒，PMIC IRQ47 唤醒、CHRDET 事件 2→4，绑定 gadget 的 PHY/时钟恢复达 6/6、error=0，RAM 哈希一致，ADB 恢复；唤醒后存储/GPU/显示通过。证据 deep-108-plug.txt、deep-108-plug-trace.txt、deep-108-after-plug.txt 及此前 deep-108-*。BoardConfig/内核命令行与打包参数已改 mem_sleep_default=deep，#110 启动确认 [deep]，默认 mem 实测有效 mode2/flags=0x3b8，连接电脑时因 USB/R0 blockers=0x10/2 回退 mode0，RAM 哈希一致，52 MHz eMMC/GPU/显示与四核恢复通过。首轮脚本错误要求 watchdog=0x14，实际保留未启用的 0x5c 并正常恢复；改按 EN=0 且前后不变核对后，完整检查通过，清理临时锁后正常熄屏 12 秒，Android Asleep、显示/系统阻塞锁均释放，ADB 保持响应，挂起计数维持 3/0。证据 default-deep-110-*。后续继续 MAINPLL/睡眠电压接管与功耗核对；主机 bus-resume 未完全验证，USB 大传输仍暂缓。
 26. **metadata 旧错误与第一阶段 fsck 已修复（#110 ramdisk）**。收尾发现 p15 /metadata 保留两次历史 ext4_journal_check_start 记录，#104/#108 的次数/时间完全一致，当前 MMC 错误计数全 0。fstab 已要求 first_stage_mount+check，但挂系统前缺可执行 fsck；新增 PRODUCT_PACKAGES=e2fsck_ramdisk，使用 AOSP 静态 ARM 工具，当前打包助手支持 --e2fsck 注入。重启已实际执行离线检查并成功挂载；超级块 state=0x1、error_count=0、首末错误时间均为 0，Android BOOT_COMPLETED=1、默认 deep，未格式化分区。新标准 boot 为 boot-default-deep-fsck.img，已同步产品目录 boot.img；内核仍为 #110。证据 default-deep-fsck-110-dmesg.txt、metadata-after-fsck-summary.json、default-deep-fsck-110-final.txt。
+27. **插拔电源亮屏策略已开启，实屏待确认**。系统实测 `config_unplugTurnsOnScreen=false`，Lineage 全局设置 `wake_when_plugged_or_unplugged=0`，所以 CHRDET 唤醒 CPU 后框架仍保持 Asleep。通过 LineageSettings 官方 PUT_global 接口把现机持久值设为 1，GET_global 已确认；新增设备资源 overlay 默认 `config_unplugTurnsOnScreen=true` 并由 DEVICE_PACKAGE_OVERLAYS 引用，后续完整构建带入。当前 system.img 未重编，现机通过已有持久设置立即生效；不改自动熄屏超时或插电常亮设置。该标准开关同时作用于插电/拔电；正记录物理插线后的框架 wakefulness 和背光状态，等待用户实屏确认。记录脚本和结果位于 out/a1260-runtime-pm/charge-screen-*。
 
 以上按顺序推进，每项区分源码接入与实机验证，不用关闭全局 PM 或常驻唤醒锁掩盖故障。
 
@@ -127,4 +128,4 @@
 ## 临时调试配置：首次 root ADB（2026-10-26）
 
 - #90 首次 ADB 连接即 uid 0，无需重启 adbd；ro.secure 仍为 1。为减少 USB/IP 因 adb root 重枚举丢附加，当前 bring-up ramdisk 在 Android 17 标准 `system/etc/ramdisk/build.prop` 中只增加 service.adb.root=1，由 first-stage init 复制给 second-stage 属性加载；工具不改 ro.secure/ro.adb.secure 或认证密钥。
-- 可重复生成工具：`tools/make_root_adb_ramdisk.py`；device.mk 仅 eng/userdebug 的后续完整系统构建设置此属性。**发布前移除此临时默认 root 选择，恢复普通调试启动策略**。当前打包工具默认使用 `out/a1260-runtime-pm/ramdisk-root-adb.img`；原始 ramdisk 和 `pack-base-before-root-adb.json` 保留。
+- 可重复生成工具：`tools/make_root_adb_ramdisk.py`；device.mk 仅 eng/userdebug 的后续完整系统构建设置此属性。**发布前移除此临时默认 root 选择，恢复普通调试启动策略**。当前打包工具默认使用 `out/a1260-runtime-pm/ramdisk-root-adb-fsck.img`；原始 ramdisk 和 `pack-base-before-root-adb.json` 保留。
