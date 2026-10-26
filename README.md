@@ -71,7 +71,7 @@ timekeeping stalls observed with virtual timers on this firmware.
 Hardware verifies all four CPUs online, local timer interrupts, correct
 shared atomic updates, monotonic time across CPU migrations and 3.98-way
 parallel execution. CPU hot-unplug, shared CPU frequency scaling and light s2idle have since been implemented; see the CPU power-management notes in TODO.md.
-SELinux is permissive during bring-up. Debug builds allow root ADB; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
+SELinux is permissive during bring-up. Debug bring-up builds select root ADB at initial daemon startup; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
 The Android image exposes only FunctionFS/ADB, without ACM or ttyGS0.
 USB ADB enumeration and root shell are verified; large bulk transfers remain unreliable.
 The fs action configures 512 MiB of logical LZ4 zram swap before ART starts.
@@ -354,3 +354,22 @@ A transient physical display misalignment was reported during this boot and
 recovered without changes. The captured screenshot is normal, with zero
 RDMA underflows and abnormal events; the cause remains unconfirmed.
 The temporary suspend-prevention wake lock has been removed; the touch IRQ is disabled before hibernation so Android can enter standby without a spurious wake event.
+
+## Initial root ADB during bring-up
+
+The eng/userdebug device profile temporarily sets `service.adb.root=1`, so
+obtaining root does not require restarting adbd and re-enumerating USB/IP.
+Remove this default selection before production. ADB authorization properties
+and keys are not changed by this setting.
+
+For an existing first-stage ramdisk, prepare a separate debug copy:
+
+```sh
+python3 device/aic/a1260/tools/make_root_adb_ramdisk.py original-ramdisk debug-ramdisk
+```
+
+Use `debug-ramdisk` as mkbootimg's ramdisk. The tool preserves the input,
+existing newc entries and properties, and adds only `service.adb.root=1` to
+`system/etc/ramdisk/build.prop`. Android 17 first-stage init preserves this
+file through the system mount for second-stage property loading. Build #90
+verified initial uid 0 without `adb root`, while `ro.secure` remained 1.

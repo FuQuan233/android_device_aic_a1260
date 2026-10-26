@@ -67,6 +67,12 @@ PRODUCT_SYSTEM_PROPERTIES += \
     debug.renderengine.backend=skiaglthreaded
 PRODUCT_SYSTEM_EXT_PROPERTIES += service.sf.prime_shader_cache=0
 
+# Temporary bring-up: initial adbd starts as root without a USB reset.
+# Remove before production; ADB authorization settings are unchanged.
+ifneq ($(filter eng userdebug,$(TARGET_BUILD_VARIANT)),)
+PRODUCT_SYSTEM_PROPERTIES += service.adb.root=1
+endif
+
 # Reference AIDL audio services keep AudioFlinger available during bring-up.
 # Physical MT6580 audio is not implemented; the boot flags select stub I/O.
 $(call inherit-product, hardware/interfaces/audio/aidl/default/audio_effects.mk)
