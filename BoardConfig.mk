@@ -20,7 +20,7 @@ BOARD_MKBOOTIMG_ARGS += --header_version 0 --kernel_offset 0x00008000
 BOARD_MKBOOTIMG_ARGS += --ramdisk_offset 0x04000000 --tags_offset 0x0e000000
 BOARD_KERNEL_CMDLINE := earlycon console=ttyS0,921600n8
 BOARD_KERNEL_CMDLINE += androidboot.hardware=mt6580 androidboot.boot_devices=11120000.mmc
-BOARD_KERNEL_CMDLINE += panic=15
+BOARD_KERNEL_CMDLINE += panic=15 mem_sleep_default=s2idle
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive enforcing=0
 BOARD_KERNEL_CMDLINE += printk.devkmsg=on
 BOARD_KERNEL_CMDLINE += androidboot.audio.tinyalsa.simulate_input=true androidboot.audio.tinyalsa.ignore_output=true
