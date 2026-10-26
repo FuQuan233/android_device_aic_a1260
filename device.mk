@@ -39,6 +39,7 @@ PRODUCT_PACKAGES += \
     android.hardware.security.keymint-service.nonsecure \
     com.android.hardware.gatekeeper.nonsecure \
     watchdogd \
+    e2fsck_ramdisk \
     sh_vendor \
     toybox_vendor \
     a1260-usb-setup

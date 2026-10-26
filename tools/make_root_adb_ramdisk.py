@@ -6,6 +6,8 @@ Android 17 first-stage init copies system/etc/ramdisk/build.prop into
 second_stage_resources before mounting system. Boot-property loading preserves
 service.adb.root from there; userdebug adbd then need not restart to become root.
 No ro.secure, ro.adb.secure or authorization-key setting is changed.
+Optionally install the static e2fsck_ramdisk binary so first-stage metadata
+checks can run before the system partition is available.
 """
 import argparse
 import gzip
@@ -13,10 +15,11 @@ import stat
 from pathlib import Path
 
 
-def make_ramdisk(src: bytes) -> bytes:
+def make_ramdisk(src: bytes, e2fsck: bytes | None = None) -> bytes:
     compressed = src.startswith(b"\x1f\x8b")
     data = gzip.decompress(src) if compressed else src
     target = "system/etc/ramdisk/build.prop"
+    fsck_target = "system/bin/e2fsck"
     entries = []
     modes = {}
     prop = b""
@@ -45,7 +48,7 @@ def make_ramdisk(src: bytes) -> bytes:
             if not stat.S_ISREG(fields[1]):
                 raise ValueError("Ramdisk build.prop must be a regular file")
             prop = data[body:body + size]
-        else:
+        elif name != fsck_target or e2fsck is None:
             entries.append(data[offset:end])
         offset = end
 
@@ -62,17 +65,22 @@ def make_ramdisk(src: bytes) -> bytes:
         entry += b"\0" * (-len(entry) % 4)
         entries.append(entry)
 
-    for directory in ("system", "system/etc", "system/etc/ramdisk"):
+    directories = ["system", "system/etc", "system/etc/ramdisk"]
+    if e2fsck is not None:
+        directories.append("system/bin")
+    for directory in directories:
         if directory in modes:
             if not stat.S_ISDIR(modes[directory]):
                 raise ValueError(f"Not a directory in ramdisk: {directory}")
         else:
             add(directory, stat.S_IFDIR | 0o755)
-    lines = [line for line in prop.splitlines()
-             if line.partition(b"=")[0].strip() != b"service.adb.root"]
-    lines += [b"# Temporary A1260 bring-up: avoid a USB reset for adb root.",
-              b"service.adb.root=1"]
+    comment = b"# Temporary A1260 bring-up: avoid a USB reset for adb root."
+    lines = [line for line in prop.splitlines() if line != comment
+             and line.partition(b"=")[0].strip() != b"service.adb.root"]
+    lines += [comment, b"service.adb.root=1"]
     add(target, stat.S_IFREG | 0o644, b"\n".join(lines) + b"\n")
+    if e2fsck is not None:
+        add(fsck_target, stat.S_IFREG | 0o755, e2fsck)
     add("TRAILER!!!", 0)
     result = b"".join(entries)
     result += b"\0" * (-len(result) % 512)
@@ -83,8 +91,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--e2fsck", type=Path,
+                        help="Static ARM e2fsck_ramdisk binary for first-stage checks")
     args = parser.parse_args()
     if args.input.resolve() == args.output.resolve():
         parser.error("Keep the original ramdisk: input and output must differ")
-    args.output.write_bytes(make_ramdisk(args.input.read_bytes()))
+    args.output.write_bytes(make_ramdisk(args.input.read_bytes(),
+                                        args.e2fsck.read_bytes() if args.e2fsck else None))
     print(f"Wrote debug ramdisk: {args.output}")
