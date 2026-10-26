@@ -4,10 +4,11 @@
 
 1. **基础接管已验证，保留未决项：PMIC 供电轨**。#42 接入 VUSB/VEMC/VIO18/VIO28，USB PHY 引用真实 VUSB，eMMC 引用真实 VEMC。实机 VEMC=3.3 V，已修正原占位 3.0 V；启动、4 MiB fsync/read 和显示开关通过。屏幕及触摸 I/O 实际接线尚无足够证据：正常内核的屏幕供电回调为空，保留显式 placeholder/dummy；共享 VIO18/VIO28 和 VEMC 暂保持常开，不凭猜测切断。
 2. **重绑定竞态已修复并验证：USB 休眠恢复**。#42 日志表明 adbd 重启后新 FunctionFS 初始化反复被冻结：系统挂起成功 6 次、失败 0 次，一条 init 动作耗时约 60 秒。短暂保留 5 秒唤醒保护能恢复枚举。#45 将设备模式 gadget 启停的限时交接接入独立唤醒源；RESET/RESUME 转交正常连接锁，未连接时最多 5 秒自动到期。原生熄屏重启 adbd 已自动恢复 configured；USB 配置 none 时实测 5014 ms 到期、s2idle/RTC 成功 1 次失败 0 次，恢复 adb 后自动枚举。临时锁已释放、插电保持亮屏为 0；标准 boot/kernel 更新为 #45。主机主动 bus suspend/remote wake、PHY 深省电仍待后续整机 PM 工作，USB 大传输继续暂缓。
-3. **基础依赖和全部分频门控已接管并验证（2026-10-26）：时钟树**。标准 boot/kernel 当前为 #55。MAINPLL/UNIVPLL 保持寄存器读回和固件频率/供电策略，全部 16 路 MPLL、12 路 UPLL 分频已由 SET/CLR 管理；消费者有正常引用或按实际 mux 保留的固件引用。补齐 CPU ARMPLL 原子切换使用的 MPLL_D2、BSP 明确保留的 D14、NFI/音频/SCAM 以及既有 USB/PWRAP/UART/SMI/GPU/eMMC 引用。#52 七档 CPU 变频、GPU 绘制和两轮熄屏/亮屏通过，闲置分支能关闭，DISP/MFG 断电后恢复零欠流。DDRPHYCFG 保留真实 mux（本机 26 MHz），EMI 保留真实 mux和只读内存源：从 DDRPHY/DRAMC 镜像得到 266499673 Hz，对应 DDR-1066，独立频率计约 266.6 MHz。一次 s2idle/RTC 成功、零失败，16 MiB RAM 哈希一致，ADB 自动恢复；#55 又完成同样的待机回归。MEMPLL_D2 bit31、活跃内存 PLL 和 mux 不改写；不将这些检查冒充 DDR 自刷新或深度睡眠。DSI 两路门控的物理父级仍无可靠记录，保持既有硬件门控、SMI 域及 MIPI PHY 依赖，不猜接；D14 的未记载下游继续按 BSP 保留。
+3. **基础依赖和全部分频门控已接管并验证（2026-10-26）：时钟树**。标准 boot/kernel 当前为 #57（新增 GPU DFS，见第 6 项）。MAINPLL/UNIVPLL 保持寄存器读回和固件频率/供电策略，全部 16 路 MPLL、12 路 UPLL 分频已由 SET/CLR 管理；消费者有正常引用或按实际 mux 保留的固件引用。补齐 CPU ARMPLL 原子切换使用的 MPLL_D2、BSP 明确保留的 D14、NFI/音频/SCAM 以及既有 USB/PWRAP/UART/SMI/GPU/eMMC 引用。#52 七档 CPU 变频、GPU 绘制和两轮熄屏/亮屏通过，闲置分支能关闭，DISP/MFG 断电后恢复零欠流。DDRPHYCFG 保留真实 mux（本机 26 MHz），EMI 保留真实 mux和只读内存源：从 DDRPHY/DRAMC 镜像得到 266499673 Hz，对应 DDR-1066，独立频率计约 266.6 MHz。一次 s2idle/RTC 成功、零失败，16 MiB RAM 哈希一致，ADB 自动恢复；#55 又完成同样的待机回归。MEMPLL_D2 bit31、活跃内存 PLL 和 mux 不改写；不将这些检查冒充 DDR 自刷新或深度睡眠。DSI 两路门控的物理父级仍无可靠记录，保持既有硬件门控、SMI 域及 MIPI PHY 依赖，不猜接；D14 的未记载下游继续按 BSP 保留。
 4. **引脚接管与 52 MHz 高速已验证：eMMC**。#49 修正真实门控为 TOPCKGEN 0x24 bit17；#55 移除 firmware-pins 旁路，由 pinctrl 管理 GPIO41–51、IOCFG_B SELGP、驱动强度、PUPD/R0/R1、输入/施密特和 TDSEL/RDSEL；复位保留 GPIO 路径并维持高电平，不尝试复位脉冲。接回板级下降沿采样：命令/写 CRC 用 IOCON，读数据使用同步 FIFO 的 PATCH_BIT0.RD_DAT_SEL。实际从 legacy 17.333 MHz 提至 8-bit MMC high-speed 52 MHz；32 MiB O_DIRECT 写入/fsync 后八次直接读回 SHA256 一致，后四次从控制器及上游分频全关状态恢复，MMC 错误计数全 0。RTC 唤醒后仍为 52 MHz，新增 4 MiB 写入/fsync/读回一致，错误计数仍全 0；GPU、显示恢复零欠流，临时数据/锁/RTC 已清理。VEMC 保留已验证 3.3 V，固定 I/O 轨不切换；HS200/HS400 及实际 I/O 接线未确认。初次 #54 高速版因漏带原厂采样边沿导致 CMD12 超时和 ext4 journal abort，已保留故障日志；修正后的 #55 启动由正常 fsck 检查 cache/userdata，未格式化分区。
 5. **基本回归通过，长期及更多唤醒场景待做：整机待机**。#55 在新时钟/eMMC/现有 GPU/DISP/PMIC 驱动下，s2idle/RTC 唤醒成功、零失败，RAM 保持、USB 重枚举、显示和唤醒后存储读写通过；不替代长期压力、各按键唤醒及深度睡眠验证。
-6. **待做：深度睡眠与 GPU 变频**。SPM/PCM、DDR 自刷新、集群断电；GPU OPP/devfreq 与供电约束。
+6. **已验证：GPU DFS/devfreq（#57）**。按旧 BSP 接入 107.25/214.5/300.3/416/500.5 MHz 五档和 MFG 两级 mux；CCF 先开新源、切 mux、再放旧源，NG 输入仅在旁路时改动。频率 OPP 不请求电压，CPU 维持共享 VPROC >=1.15 V；固定 CPU 1.3 GHz 时逐档 GPU 绘制全部正确，VPROC 始终 1.3 V。100 ms simple_ondemand 使用 DDK 入队至完成的任务繁忙时间，连续 8 秒 1024x1024 绘制完成 1804 帧、自动从 107.25 升至 500.5 MHz，结束后降回低档并断 MFG 电，空闲时 devfreq 计数停止。s2idle/RTC 成功 1 次、零失败，16 MiB RAM 哈希、ADB、绘制/显示恢复正常，eMMC 52 MHz 错误计数全 0。最终镜像冷启动和熄屏/亮屏通过，临时锁和覆盖已清理。
+7. **下一项：SPM/PCM 深度睡眠**。已核对老内核 725 字 PCM、26M/APSRC 事件向量、UART/GIC/CIRQ、PWRAP 阶段和 CPU dormant 依赖。MT6580 suspend 的 PWRAP 命令是 AUXADC START 清/置，不是 CPU 调压表；deep-idle 另有 VCORE 控制。顺序：CIRQ 层级接入 → 统一 SPM 访问/保留 CPU、infra、DDR 的 PCM 初始化和唤醒记录 → CPU0 上下文/恢复入口 → DDR 自刷新、集群断电。当前仍是 s2idle，不能称深度睡眠已完成。
 
 以上按顺序推进，每项区分源码接入与实机验证，不用关闭全局 PM 或常驻唤醒锁掩盖故障。
 
@@ -35,7 +36,7 @@
 - 已通过驱动挂起/恢复、三轮 RTC 唤醒以及 Android SystemSuspend 自动挂起；ADB 可自动恢复。触摸驱动提前关 IRQ 后，已消除休眠命令引起的输入唤醒重试，自动挂起一次成功、失败计数为 0。用户确认实际待机后电源键能唤醒，画面和触摸正常，ADB 自动恢复。
 - 已从 `rootdir/init.mt6580.rc` 删除 `a1260-bringup` 临时唤醒锁及其说明。`CONFIG_PM_WAKELOCKS=y` 提供接口，本身不持锁；主机更新时使用的短期维护锁必须在工作结束或重启时释放。
 - 最终 #21 普通内核（`CONFIG_PM_DEBUG=n`）两次自动挂起分别通过电源键及 RTC 唤醒，成功 2 次、失败 0 次；Android 分别计得睡眠 61.382 秒、挂起开销 0.753 秒。原先触摸 IRQ 顺序导致的重复 `-EBUSY` 已不再出现。
-- 当前实现是 s2idle/WFI；SPM/PCM 深度睡眠、集群断电和 DDR 自刷新尚未移植，不能宣称最低待机功耗已经完成。GPU 仍使用已有固定频率配置。
+- 当前实现是 s2idle/WFI；SPM/PCM 深度睡眠、集群断电和 DDR 自刷新尚未移植，不能宣称最低待机功耗已经完成。GPU 已在 #57 接入五档 DFS/devfreq，见开头第 6 项。
 
 ## 图形
 
