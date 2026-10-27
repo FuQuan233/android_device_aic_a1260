@@ -407,10 +407,17 @@ factory Evidence, current LK comparison and unresolved physical rail wiring.
 
 ## PWRAP link qualification
 
-Build #129 recovers late WACS2 read results before issuing another command
-and checks the fixed MT6350 DEW signature at probe and around suspend.
-Seven CPU frequency/voltage points and three deep/resume intervals passed;
-failed commands are never replayed. The read-only `link_state` attribute
-exposes test results and transport errors. Independent cold initialization
-and destructive link reset remain pending; LK still establishes the bus.
+Build #132 supports MT6350 serial-link initialization before PMIC consumers,
+with the real TOPRGU reset, CCF source/gates, bounded calibration, DIO,
+cipher and CRC setup. Normal startup retains a working firmware link. A
+qualification boot reconstructed the link from reset (window 0x0000ff,
+center 3), preserved VPROC, and passed seven CPU OPPs and three deep resumes.
+The ordinary image contains no force-init parameter. Bootstrap supplies/pins
+and complete online fault-reset handling remain separate requirements.
 See `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-pwrap-link.rst`.
+
+The same build retains the bounded USB enumeration guard through RESET and
+renews it for an unconfigured SUSPEND. Five screen-off root/unroot switches
+reconnected automatically over USB/IP, without a temporary wake lock or
+stay-on setting. Default ADB is still ordinary userdebug shell; other host
+bus-suspend/remote-wakeup and bulk-transfer qualification remain pending.
