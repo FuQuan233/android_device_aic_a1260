@@ -429,8 +429,8 @@ controls through the clock driver. CPUFreq pauses ARMPLL automatic gating;
 deep pauses the owned controls before the PLL/mux transition and restores
 them in the finisher. Seven OPPs, SMP/hotplug, three deep resumes and
 post-resume graphics/direct storage passed; no late DCM repair was needed.
-The normal backup confirms MCUSYS default ON is a no-op, so MCUSYS/L2 and
-memory DCM remain unmodified. Four online CPUs continue to use WFI/DCM;
+The normal backup confirms MCUSYS default ON is a no-op. MCUSYS/L2 DCM
+remains unmodified; EMI DCM is added separately below. Four online CPUs continue to use WFI/DCM;
 electrical savings have not been measured. See `mt6580-dcm.rst`.
 
 ## CPU0 runtime dormant
@@ -457,5 +457,27 @@ RAM hashes and timer deadlines passed. See `mt6580-cpuidle.rst` and
 
 The same final image passed two complete system-deep cycles, with RAM,
 DCM/PWRAP restoration, Mali rendering/readback, aligned direct eMMC I/O and
-four-core/clock-migration checks afterward. Product `boot.img`/`kernel` use
+four-core/clock-migration checks afterward. At #150, product `boot.img`/`kernel` used
 `boot-dormant.img`/`kernel-dormant`; ordinary ADB remains shell.
+
+## EMI clock management and inherited DRAMC policy
+
+Build #151 enables the BSP EMI automatic gate, debounce15 and /32 idle ratio.
+TOPCKGEN owns a named EMI register resource; DDR PLL frequency and timings
+stay unchanged. The existing DRAMC policy was already enabled by preloader
+and remains firmware-owned, with read-only policy and resume diagnostics.
+EMI is paused before AXI/MAINPLL sleep transitions and restored in the early
+finisher; unresolved restoration cannot proceed to normal device resume.
+
+Two full deep cycles passed with EMI pause/restore2/2, matching policy and
+RAM hashes, no late repair, and unchanged DRAMC enables. Four workers passed
+64 MiB/eight memory-pattern rounds, including a run concurrent with Mali;
+graphics readback, direct eMMC I/O and four-core coherence passed afterward.
+Normal-governor CPU0 dormant completed 1237 actual resets with no failures.
+The calculated memory source remains 266499673 Hz. Current product images
+use `boot-memory-dcm.img`/`kernel-memory-dcm`; default ADB remains shell.
+See `mt6580-memory-dcm.rst` and `out/a1260-runtime-pm/memory-dcm/summary.json`.
+
+Final cleanup also allowed an automatic 55.747988563-second deep sleep;
+total suspend success/failure became3/0, EMI early pause/restore3/3 and
+DRAMC policy checks3/failures0, still with no late EMI repair.
