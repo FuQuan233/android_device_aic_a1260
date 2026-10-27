@@ -1,12 +1,12 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 boot-normal-adb.img（内核仍 #121，第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
+当前标准镜像为 boot-factory-battery-1850.img（内核 #126，第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
 
 ## 当前剩余项核对（2026-10-27）
 
 以下为本次按实际 DTS、驱动和运行状态核对后的清单；后文带版本号的记录按时间保留，旧版“未实现”说明由后续验证覆盖。
 
-- **电量参数与原机估算已恢复到源码，待上机（2026-10-27）**：用户确认电池铭牌1850 mAh / 3.7 V / 6.845 Wh，设计容量和能量已改；保持4.2 V充电上限及500 mA USB限流。从实机正常boot备份恢复4温度各102点OCV/R表和有效Qmax1600/1798/1838/1815 mAh，替换1397 mAh参考模型；双OAM/D2、五次阻抗迭代、30次温度窗口、整秒/0.1mAh积分、4mA固定睡眠估计和>1800秒较低HWOCV重标定已接。RTC_AL_HOU[14:8]通过同锁NVMEM保存UI，主线BQ真实Full继续作为充满依据；UI100反推BATFULL的旧充电服务不移植。整数零除/溢出及失败挂起导致UI快进做了明确防护。独立参考9742个state/154224个查表值及ASAN/UBSAN通过，内核/DT编译通过，尚未刷入验证；按需adb root后USB/IP附加掉了，等待重新附加。充电暂停恢复、RTC跨重启/闹钟并发及实际睡眠读数待实机核对。4mA仍不是实测，旧SW路径没有已确认生效的老化算法，移植原机曲线也不等于已重新标定老化电芯。详见内核Documentation/arm/mediatek/mt6350-stock-fuel-gauge.rst和out/a1260-runtime-pm/battery-stock-1850。
+- **电量参数与原机估算已上机，RTC跨重启通过（#126，2026-10-27）**：用户确认电池铭牌1850 mAh / 3.7 V / 6.845 Wh，设计容量和能量已改；保持4.2 V充电上限及500 mA USB限流。从实机正常boot备份恢复4温度各102点OCV/R表和有效Qmax1600/1798/1838/1815 mAh，替换1397 mAh参考模型；双OAM/D2、五次阻抗迭代、30次温度窗口、整秒/0.1mAh积分、4mA固定睡眠估计和>1800秒较低HWOCV重标定已接。RTC_AL_HOU[14:8]通过同锁NVMEM保存UI，主线BQ真实Full继续作为充满依据；UI100反推BATFULL的旧充电服务不移植。整数零除/溢出及失败挂起导致UI快进做了明确防护。独立参考9742个state/154224个查表值及ASAN/UBSAN通过，内核/DT编译通过；重新附加后已刷入#126并完成Android启动，默认ADB仍shell。实机设计容量1850000uAh、设计能量6845000uWh、初始SOC94/Qmax1836mAh；RTC提交读回error=0，充电恢复Fast、输入500000uA，真实Full后UI逐点升到100。再次普通重启后boot ID变化、seed_rtc=1，启动日志确认RTC种子100，RTC时间正常、存储与采样无新错误；物理拔线/自动deep/插回已完成：SPM实际停钟108.261796893秒，电量计记录108秒，CPU0/L2 cold恢复、MAINPLL off/on各1、恢复错误0；插拔前后100%，Fast/500000uA恢复，RTC/采样error=0。首次自动入睡因拔线mt6350-usb待唤醒在freeze阶段0.004秒内以-EBUSY取消，随后重试成功；统计1成功/1freeze取消、设备挂起和恢复失败全0，不冒充零取消。日志脚本COMPLETE且已清理，无新增闹钟或锁；产品boot.img/kernel同步#126。完整周期精度与长睡眠OCV重标定仍待后续观察，记录见runtime-summary.json、cable.log、suspend-details.txt。4mA仍不是实测，旧SW路径没有已确认生效的老化算法，移植原机曲线也不等于已重新标定老化电芯。详见内核Documentation/arm/mediatek/mt6350-stock-fuel-gauge.rst和out/a1260-runtime-pm/battery-stock-1850。
 - **临时默认 root 已移除**：device.mk 不再设置 service.adb.root=1，工具改为 tools/prepare_ramdisk.py，删除旧 ramdisk 的该属性并保留静态 fsck。当前打包默认 ramdisk-fsck.img，标准 boot-normal-adb.img 保留原 #121 内核及自动 deep；不更改 ro.secure、ADB 认证或 userdebug 按需 adb root 能力。实机重启后 uid=2000(shell)、service.adb.root 未设置、ro.secure=1、ro.debuggable=1、BOOT_COMPLETED=1；四核在线、schedutil/604500..1300000 kHz、默认 deep，SurfaceFlinger/activity 服务正常。证据 normal-adb-{startup,final,flash}.txt，产品目录 boot.img 已同步。
 
 SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完成）：
