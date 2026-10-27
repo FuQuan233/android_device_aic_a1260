@@ -505,3 +505,15 @@ retained together. Normal shell boot, two live high/low OPP resets and one
 soft inspection were repeated on that final build. The preceding #156 also
 passed 1218 actual CPU0 dormant restores with RAM/four-CPU recovery. Root
 access was used on demand and restored to ordinary shell after testing.
+
+Build #161 enables the BSP CG1 MCUSYS and CG3 BIU bus policy while retaining
+L2 /2 and leaving SRAM CG2 unchanged. CPUFreq and system deep serialize
+pause/restore with their existing clock transactions. Hardware showed BIU
+resets with CPU0 runtime power-down; it now restores in the PCM wait callback
+before arch/GIC clients exit CPU PM, including abort cleanup. Seven OPPs,
+full deep twice,911 runtime reset/restores with912 matched clock phases,
+RAM/GPU/direct-I/O and four-core checks passed. Late repairs and clock
+errors were zero; default Windows ADB reconnected automatically. Standard
+boot/kernel now use #161, ordinary shell and normal power policy retained.
+Physical power/current and failure injection are still unmeasured. See
+`kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-mcusys-dcm.rst`.
