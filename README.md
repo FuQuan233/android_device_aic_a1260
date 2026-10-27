@@ -421,3 +421,14 @@ renews it for an unconfigured SUSPEND. Five screen-off root/unroot switches
 reconnected automatically over USB/IP, without a temporary wake lock or
 stay-on setting. Default ADB is still ordinary userdebug shell; other host
 bus-suspend/remote-wakeup and bulk-transfer qualification remain pending.
+
+## CPU and bus DCM
+
+Build #133 enables BSP CPU Mode 1 and infra/peripheral automatic slow/gate
+controls through the clock driver. CPUFreq pauses ARMPLL automatic gating;
+deep pauses the owned controls before the PLL/mux transition and restores
+them in the finisher. Seven OPPs, SMP/hotplug, three deep resumes and
+post-resume graphics/direct storage passed; no late DCM repair was needed.
+The normal backup confirms MCUSYS default ON is a no-op, so MCUSYS/L2 and
+memory DCM remain unmodified. Runtime cpuidle is still WFI, and electrical
+savings have not been measured. See the kernel's `mt6580-dcm.rst`.
