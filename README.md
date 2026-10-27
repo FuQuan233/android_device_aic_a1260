@@ -553,3 +553,50 @@ to zero. No stock libraries are installed into the product. Actual decoder
 initialization, jobs/IRQ completion and Android hardware video decoding remain
 pending. See the kernel's mt6580-vcodec-buffers.rst for failure evidence and
 qualification scope. Standard boot/kernel now use #178.
+
+
+The current development build #182 has now completed real native H.264
+hardware decoding, including the separate MP4-VENC auxiliary register window.
+The independent socket worker matches 128x96 and 1280x720 Baseline sample
+pixels, tokens and PTS against libavc reference output, with real IRQs and no
+decode timeouts. Continuous 128-frame descriptor reuse and reset/EOS pass.
+The Android Codec2 AIDL V2 frontend and isolated worker now pass real
+MediaCodec decoding: 48 frames at 128x96 and another 48 at 1280x720 match
+independent I420 reference pixels, with automatic hardware selection, original
+PTS, flush, both EOS forms, stop/reconfigure/start and repeated release.
+Surface -> external GLES texture -> Mali-400 MP readback also passes eight
+changing frames. The native counters account for all 104 jobs/IRQs, with zero
+timeouts/cancellations/faults/power errors and no live buffers after release.
+The standard product boot/kernel are #182.
+See `media/` and `tools/prepare_stock_vcodec.py` for the source integration.
+The legacy library dependencies are installed only in the worker's private
+`/vendor/lib/mt6580-codec` directory; ordinary C2 services never load them.
+
+
+The minigbm patch includes linear YV12 support while preserving the exact
+168-byte, two-FD stock Mali handle ABI. Three logical Y/V/U planes share one
+image DMA-BUF; checked strides/offsets are derived without overwriting the
+stock payload. YUV is composed by the GPU, not advertised as direct KMS
+scanout. DMA heaps inherit the AOSP 0444 permissions so app-side MediaCodec
+and software codecs can allocate input buffers. The adapter opens heap nodes
+read-only and requests writable allocated DMA-BUFs through the normal ioctl.
+
+To generate the private decoder package locally (no DSOs or efuses in Git):
+
+```sh
+python3 device/aic/a1260/tools/prepare_stock_vcodec.py /path/to/stock/system \
+    vendor/aic/a1260-codec --kernel kernel/aic/mt6580 \
+    --cc /path/to/ndk/bin/armv7a-linux-androideabi28-clang
+```
+
+Run the existing minigbm patch before building. Stock codec dependencies live
+only under `/vendor/lib/mt6580-codec`; the modern C2 frontend stays isolated
+from the old C++ runtime. The worker runs as mediacodec with CAP_SYS_RAWIO,
+not root; adbd retains ordinary userdebug shell behavior. The private DRVB
+pathname adapts to this device's real devinfo file, preserving its validation.
+Current hardware scope is one progressive H.264 Baseline/ConstrainedBaseline
+stream up to 1280x720. Main/High, interlaced, adaptive/secure/tunneled playback,
+other codecs, throughput guarantees and a zero-copy output path are not
+qualified. Frame transfer currently uses explicit CPU copies. Evidence is in
+`out/a1260-runtime-pm/vcodec-next/mediacodec-yuv-final.txt`,
+`mediacodec-720-final.txt` and `surface-yuv-final.txt`.

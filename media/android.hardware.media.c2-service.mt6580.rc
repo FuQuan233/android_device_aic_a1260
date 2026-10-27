@@ -1,0 +1,6 @@
+service vendor.media.c2.mt6580 /vendor/bin/hw/android.hardware.media.c2-service.mt6580
+    class hal
+    user mediacodec
+    group mediacodec mediadrm drmrpc
+    ioprio rt 4
+    task_profiles ProcessCapacityHigh

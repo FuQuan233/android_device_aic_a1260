@@ -1,0 +1,12 @@
+# The native codec UAPI remains CAP_SYS_RAWIO protected. Only this isolated
+# worker receives that capability; the C2 service remains unprivileged.
+service vendor.mt6580-codec-worker /vendor/bin/mt6580-codec-worker
+    class hal
+    user mediacodec
+    group mediacodec graphics
+    capabilities SYS_RAWIO
+    socket mt6580-vcodec stream 0660 mediacodec mediacodec
+    setenv MT6580_CODEC_LIBDIR /vendor/lib/mt6580-codec
+    setenv LD_LIBRARY_PATH /vendor/lib/mt6580-codec
+    setenv LD_PRELOAD /vendor/lib/mt6580-codec/libval-decode-bridge.so
+    task_profiles ProcessCapacityHigh

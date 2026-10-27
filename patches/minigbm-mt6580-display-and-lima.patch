@@ -24,10 +24,34 @@ index 1500892..444806b 100644
  }
  
 diff --git a/cros_gralloc/cros_gralloc_buffer.cc b/cros_gralloc/cros_gralloc_buffer.cc
-index c738830..90b059c 100644
+index c738830..2aee0a3 100644
 --- a/cros_gralloc/cros_gralloc_buffer.cc
 +++ b/cros_gralloc/cros_gralloc_buffer.cc
-@@ -153,7 +153,7 @@ int64_t cros_gralloc_buffer::get_plane_fd(uint32_t plane) const
+@@ -135,17 +135,20 @@ uint32_t cros_gralloc_buffer::get_num_planes() const
+ 
+ uint32_t cros_gralloc_buffer::get_plane_offset(uint32_t plane) const
+ {
+-	return hnd_->offsets[plane];
++	cros_gralloc_plane_layout layout;
++	return cros_gralloc_get_plane_layout(hnd_, plane, &layout) ? layout.offset : 0;
+ }
+ 
+ uint32_t cros_gralloc_buffer::get_plane_stride(uint32_t plane) const
+ {
+-	return hnd_->strides[plane];
++	cros_gralloc_plane_layout layout;
++	return cros_gralloc_get_plane_layout(hnd_, plane, &layout) ? layout.stride : 0;
+ }
+ 
+ uint32_t cros_gralloc_buffer::get_plane_size(uint32_t plane) const
+ {
+-	return hnd_->sizes[plane];
++	cros_gralloc_plane_layout layout;
++	return cros_gralloc_get_plane_layout(hnd_, plane, &layout) ? layout.size : 0;
+ }
+ 
+ int64_t cros_gralloc_buffer::get_plane_fd(uint32_t plane) const
+@@ -153,7 +156,7 @@ int64_t cros_gralloc_buffer::get_plane_fd(uint32_t plane) const
  	if (plane >= hnd_->num_planes) {
  		return -1;
  	}
@@ -36,7 +60,7 @@ index c738830..90b059c 100644
  }
  
  int32_t cros_gralloc_buffer::get_android_format() const
-@@ -441,7 +441,7 @@ int32_t cros_gralloc_buffer::flush()
+@@ -441,7 +444,7 @@ int32_t cros_gralloc_buffer::flush()
  
  int32_t cros_gralloc_buffer::get_reserved_region(void **addr, uint64_t *size) const
  {
@@ -46,12 +70,14 @@ index c738830..90b059c 100644
  		ALOGE("Buffer does not have reserved region.");
  		return -EINVAL;
 diff --git a/cros_gralloc/cros_gralloc_driver.cc b/cros_gralloc/cros_gralloc_driver.cc
-index 706dee9..170034e 100644
+index 706dee9..af2d105 100644
 --- a/cros_gralloc/cros_gralloc_driver.cc
 +++ b/cros_gralloc/cros_gralloc_driver.cc
-@@ -12,6 +12,9 @@
+@@ -11,7 +11,11 @@
+ #include <fcntl.h>
  #include <hardware/gralloc.h>
  #include <sys/mman.h>
++#include <sys/stat.h>
  #include <syscall.h>
 +#include <linux/dma-buf.h>
 +#include <sys/ioctl.h>
@@ -59,7 +85,7 @@ index 706dee9..170034e 100644
  #include <xf86drm.h>
  
  #include "../drv_helpers.h"
-@@ -82,19 +85,31 @@ int memfd_create_reserved_region(const std::string &buffer_name, uint64_t reserv
+@@ -82,19 +86,31 @@ int memfd_create_reserved_region(const std::string &buffer_name, uint64_t reserv
  
  std::shared_ptr<cros_gralloc_driver> cros_gralloc_driver::get_instance()
  {
@@ -97,7 +123,7 @@ index 706dee9..170034e 100644
  {
  	int fd;
  	char *node;
-@@ -110,13 +125,31 @@ static struct driver *init_try_node(int idx, char const *str)
+@@ -110,13 +126,31 @@ static struct driver *init_try_node(int idx, char const *str)
  		return NULL;
  
  	drv = drv_create(fd, NULL);
@@ -131,7 +157,7 @@ index 706dee9..170034e 100644
  {
  	/*
  	 * Create a driver from render nodes first, then try card
-@@ -136,14 +169,14 @@ static struct driver *init_try_nodes()
+@@ -136,14 +170,14 @@ static struct driver *init_try_nodes()
  
  	// Try render nodes...
  	for (uint32_t i = min_render_node; i < max_render_node; i++) {
@@ -148,7 +174,7 @@ index 706dee9..170034e 100644
  		if (drv)
  			return drv;
  	}
-@@ -167,8 +200,8 @@ static bool is_running_with_software_rendering()
+@@ -167,8 +201,8 @@ static bool is_running_with_software_rendering()
  					     strstr(vulkan_driver, "pastel") != nullptr));
  }
  
@@ -159,16 +185,22 @@ index 706dee9..170034e 100644
        is_running_with_software_rendering_(is_running_with_software_rendering())
  {
  }
-@@ -215,6 +248,17 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
+@@ -215,6 +249,23 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
  		resolved_use_flags |= BO_USE_LINEAR;
  		combo = drv_get_combination(drv_.get(), resolved_format, resolved_use_flags);
  	}
 +#ifdef MT6580_UTGARD_HANDLE
-+ /* The old RGB Mali platform ABI has no multi-plane/FP16 representation. */
++ /* Keep only stock-compatible RGB and standard, linear YV12 layouts. */
 + switch (resolved_format) {
 + case DRM_FORMAT_ABGR8888: case DRM_FORMAT_XBGR8888:
 + case DRM_FORMAT_ARGB8888: case DRM_FORMAT_XRGB8888:
 + case DRM_FORMAT_RGB565: case DRM_FORMAT_BGR888: case DRM_FORMAT_R8:
++  break;
++ case DRM_FORMAT_YVU420_ANDROID:
++  if (descriptor->droid_format != HAL_PIXEL_FORMAT_YV12 || !descriptor->width ||
++      !descriptor->height || (descriptor->width & 1) || (descriptor->height & 1) ||
++      descriptor->client_metadata_size > SIZE_MAX - sizeof(cros_gralloc_buffer_metadata))
++   return false;
 +  break;
 + default: return false;
 + }
@@ -177,7 +209,7 @@ index 706dee9..170034e 100644
  	if (!combo)
  		return false;
  
-@@ -270,6 +314,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+@@ -270,6 +321,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
  	struct bo *bo;
  	struct cros_gralloc_handle *hnd;
  	std::unique_ptr<cros_gralloc_buffer> buffer;
@@ -187,12 +219,14 @@ index 706dee9..170034e 100644
  
  	if (!get_resolved_format_and_use_flags(descriptor, &resolved_format, &resolved_use_flags)) {
  		ALOGE("Failed to resolve format and use_flags.");
-@@ -284,6 +331,19 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+@@ -284,7 +338,41 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
  	}
  
  	num_planes = drv_bo_get_num_planes(bo);
+-	num_fds = num_planes;
 +#ifdef MT6580_UTGARD_HANDLE
-+ if (num_planes != 1 || drv_bo_get_format_modifier(bo) != 0 ||
++ const bool yv12 = resolved_format == DRM_FORMAT_YVU420_ANDROID;
++ if (num_planes != (yv12 ? 3u : 1u) || drv_bo_get_format_modifier(bo) != 0 ||
 +     drv_bo_get_plane_offset(bo, 0) != 0 ||
 +     !drv_bo_get_plane_stride(bo, 0) ||
 +     drv_bo_get_total_size(bo) > UINT32_MAX) {
@@ -203,13 +237,36 @@ index 706dee9..170034e 100644
 +  drv_bo_destroy(bo);
 +  return -ENOTSUP;
 + }
++ if (yv12) {
++  cros_gralloc_plane_layout planes[3];
++  if (!cros_gralloc_yv12_layout(drv_bo_get_width(bo), drv_bo_get_height(bo),
++                                drv_bo_get_plane_stride(bo, 0),
++                                drv_bo_get_total_size(bo), planes)) {
++   drv_bo_destroy(bo);
++   return -ENOTSUP;
++  }
++  for (size_t plane = 0; plane < 3; ++plane) {
++   if (drv_bo_get_plane_stride(bo, plane) != planes[plane].stride ||
++       drv_bo_get_plane_offset(bo, plane) != planes[plane].offset ||
++       drv_bo_get_plane_size(bo, plane) != planes[plane].size) {
++    drv_bo_destroy(bo);
++    return -ENOTSUP;
++   }
++  }
++ }
++ // Physical FD count is independent of the three logical YV12 planes.
++ num_fds = 1;
++#else
++ num_fds = num_planes;
 +#endif
- 	num_fds = num_planes;
  
  	if (descriptor->enable_metadata_fd)
-@@ -295,7 +355,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 		num_fds += 1;
+@@ -294,22 +382,35 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 
  	hnd =
  	    reinterpret_cast<struct cros_gralloc_handle *>(native_handle_create(num_fds, num_ints));
++ if (!hnd) { drv_bo_destroy(bo); return -ENOMEM; }
  
 -	for (size_t i = 0; i < DRV_MAX_FDS; i++)
 +	memset(reinterpret_cast<char *>(hnd) + sizeof(native_handle_t), 0,
@@ -218,7 +275,17 @@ index 706dee9..170034e 100644
  		hnd->fds[i] = -1;
  
  	hnd->num_planes = num_planes;
-@@ -304,7 +366,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
++#ifdef MT6580_UTGARD_HANDLE
++ // The stock arrays are overlapping aliases, not storage for extra planes.
++ ret = drv_bo_get_plane_fd(bo, 0);
++ if (ret < 0) goto destroy_hnd;
++ hnd->fds[1] = ret;
++ hnd->strides[0] = drv_bo_get_plane_stride(bo, 0);
++ hnd->offsets[0] = 0;
++ hnd->sizes[0] = drv_bo_get_total_size(bo);
++#else
+ 	for (size_t plane = 0; plane < num_planes; plane++) {
+ 		ret = drv_bo_get_plane_fd(bo, plane);
  		if (ret < 0)
  			goto destroy_hnd;
  
@@ -227,7 +294,13 @@ index 706dee9..170034e 100644
  		hnd->strides[plane] = drv_bo_get_plane_stride(bo, plane);
  		hnd->offsets[plane] = drv_bo_get_plane_offset(bo, plane);
  		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
-@@ -318,7 +380,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+ 	}
+ 
++#endif
+ 	hnd->reserved_region_size = 0;
+ 	if (descriptor->enable_metadata_fd) {
+ 		hnd->reserved_region_size =
+@@ -318,7 +419,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
  		if (ret < 0)
  			goto destroy_hnd;
  
@@ -236,7 +309,7 @@ index 706dee9..170034e 100644
  	}
  
  	static std::atomic<uint32_t> next_buffer_id{ 1 };
-@@ -335,6 +397,41 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+@@ -335,6 +436,41 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
  	hnd->droid_format = descriptor->droid_format;
  	hnd->usage = descriptor->droid_usage;
  	hnd->total_size = hnd->reserved_region_size + drv_bo_get_total_size(bo);
@@ -250,7 +323,7 @@ index 706dee9..170034e 100644
 +  * never describe that padding as another visible screen row. */
 + hnd->sizes[0] = drv_bo_get_total_size(bo);
 + hnd->stock_size = hnd->sizes[0];
-+ hnd->stock_allocation_height = hnd->sizes[0] / hnd->strides[0];
++ hnd->stock_allocation_height = yv12 ? hnd->height : hnd->sizes[0] / hnd->strides[0];
 + hnd->stock_width = hnd->width;
 + hnd->stock_height = hnd->height;
 + switch (hnd->format) {
@@ -278,7 +351,7 @@ index 706dee9..170034e 100644
  
  	buffer = cros_gralloc_buffer::create(bo, hnd);
  	if (!buffer) {
-@@ -358,6 +455,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
+@@ -358,6 +494,9 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
  			.buffer = buffer.get(),
  			.refcount = 1,
  		};
@@ -288,13 +361,24 @@ index 706dee9..170034e 100644
  		handles_.emplace(hnd, hnd_info);
  		buffers_.emplace(hnd->id, std::move(buffer));
  	}
-@@ -400,6 +500,17 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
+@@ -400,6 +539,28 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
  		return 0;
  	}
  
 +#ifdef MT6580_UTGARD_HANDLE
 + /* Never trust producer virtual addresses/PIDs carried over Binder. This
 +  * mapping belongs to this imported native_handle and its retain lifetime. */
++ if (hnd->format == DRM_FORMAT_YVU420_ANDROID) {
++  if (hnd->reserved_region_size < sizeof(cros_gralloc_buffer_metadata))
++   return -EINVAL;
++  struct stat image_stat, metadata_stat;
++  if (fstat(hnd->fds[1], &image_stat) || fstat(hnd->fds[0], &metadata_stat))
++   return -errno;
++  if (image_stat.st_size < 0 || metadata_stat.st_size < 0 ||
++      static_cast<uint64_t>(image_stat.st_size) < hnd->sizes[0] ||
++      static_cast<uint64_t>(metadata_stat.st_size) < hnd->reserved_region_size)
++   return -EINVAL;
++ }
 + void *stock_addr = mmap(nullptr, hnd->sizes[0], PROT_READ | PROT_WRITE,
 +                         MAP_SHARED, hnd->fds[1], 0);
 + if (stock_addr == MAP_FAILED)
@@ -306,7 +390,7 @@ index 706dee9..170034e 100644
  	uint32_t id = hnd->id;
  
  	cros_gralloc_buffer *buffer = nullptr;
-@@ -423,9 +534,11 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
+@@ -423,9 +584,14 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
  			.tiling = hnd->tiling,
  			.use_flags = hnd->use_flags,
  		};
@@ -315,13 +399,16 @@ index 706dee9..170034e 100644
 -		memcpy(data.offsets, hnd->offsets, sizeof(data.offsets));
 +		for (uint32_t plane = 0; plane < hnd->num_planes; plane++) {
 +   data.fds[plane] = hnd->fds[cros_gralloc_plane_fd_index(plane)];
-+   data.strides[plane] = hnd->strides[plane];
-+   data.offsets[plane] = hnd->offsets[plane];
++   cros_gralloc_plane_layout layout;
++   if (!cros_gralloc_get_plane_layout(hnd, plane, &layout))
++    return -EINVAL;
++   data.strides[plane] = layout.stride;
++   data.offsets[plane] = layout.offset;
 +  }
  
  		struct bo *bo = drv_bo_import(drv_.get(), &data);
  		if (!bo)
-@@ -444,6 +557,14 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
+@@ -444,6 +610,14 @@ int32_t cros_gralloc_driver::retain(buffer_handle_t handle)
  		.buffer = buffer,
  		.refcount = 1,
  	};
@@ -336,7 +423,7 @@ index 706dee9..170034e 100644
  	handles_.emplace(hnd, hnd_info);
  	return 0;
  }
-@@ -464,8 +585,25 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
+@@ -464,8 +638,25 @@ int32_t cros_gralloc_driver::release(buffer_handle_t handle)
  		return -EINVAL;
  	}
  
@@ -363,7 +450,7 @@ index 706dee9..170034e 100644
  
  	if (buffer->decrease_refcount() == 0) {
  		buffers_.erase(buffer->get_id());
-@@ -655,3 +793,47 @@ void cros_gralloc_driver::with_each_buffer(
+@@ -655,3 +846,47 @@ void cros_gralloc_driver::with_each_buffer(
  	for (const auto &pair : buffers_)
  		function(pair.second.get());
  }
@@ -457,10 +544,10 @@ index 4e1fdf2..b3c64f4 100644
  
  	std::mutex mutex_;
 diff --git a/cros_gralloc/cros_gralloc_handle.h b/cros_gralloc/cros_gralloc_handle.h
-index 167972e..8417fe8 100644
+index 167972e..9a881a5 100644
 --- a/cros_gralloc/cros_gralloc_handle.h
 +++ b/cros_gralloc/cros_gralloc_handle.h
-@@ -8,11 +8,40 @@
+@@ -8,11 +8,41 @@
  #define CROS_GRALLOC_HANDLE_H
  
  #include <cstdint>
@@ -472,8 +559,9 @@ index 167972e..8417fe8 100644
  
 +#ifdef MT6580_UTGARD_HANDLE
 +/* Exact stock ARM32 wire ABI. No native pointers may be trusted after IPC.
-+ * One image plane only: the array views overlap stock geometry/usage words.
-+ * Never copy full array views; import only the validated num_planes entries.
++ * A single image DMA-BUF may contain three YV12 planes. The array views
++ * overlap stock geometry/usage words: only index zero is stored on the wire.
++ * Other plane descriptors are recovered by the checked layout helpers.
 + */
 +struct cros_gralloc_handle : public native_handle_t {
 + int32_t fds[2]; /* fd0: modern metadata; fd1: image DMA-BUF */
@@ -501,7 +589,7 @@ index 167972e..8417fe8 100644
  struct cros_gralloc_handle : public native_handle_t {
  	/*
  	 * File descriptors must immediately follow the native_handle_t base and used file
-@@ -42,6 +71,23 @@ struct cros_gralloc_handle : public native_handle_t {
+@@ -42,6 +72,24 @@ struct cros_gralloc_handle : public native_handle_t {
  	uint64_t total_size; /* Total allocation size */
  } __attribute__((packed));
  
@@ -510,7 +598,8 @@ index 167972e..8417fe8 100644
  typedef const struct cros_gralloc_handle *cros_gralloc_handle_t;
 +static inline uint32_t cros_gralloc_plane_fd_index(uint32_t plane) {
 +#ifdef MT6580_UTGARD_HANDLE
-+ return plane + 1;
++ (void)plane;
++ return 1;
 +#else
 + return plane;
 +#endif
@@ -526,29 +615,100 @@ index 167972e..8417fe8 100644
  
  #endif
 diff --git a/cros_gralloc/cros_gralloc_helpers.cc b/cros_gralloc/cros_gralloc_helpers.cc
-index b18277c..411be3c 100644
+index b18277c..c71ad8f 100644
 --- a/cros_gralloc/cros_gralloc_helpers.cc
 +++ b/cros_gralloc/cros_gralloc_helpers.cc
-@@ -185,6 +185,9 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage)
+@@ -183,9 +183,60 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage)
+ 	return map_flags;
+ }
  
++#ifdef MT6580_UTGARD_HANDLE
++bool cros_gralloc_yv12_layout(uint32_t width, uint32_t height, uint32_t ystride,
++                            uint32_t allocation_size,
++                            cros_gralloc_plane_layout planes[3])
++{
++    if (!planes || !width || !height || (width & 1) || (height & 1) ||
++        ystride < width || ystride % 32 || !allocation_size)
++        return false;
++    const uint64_t cstride = ((static_cast<uint64_t>(ystride) / 2 + 15) / 16) * 16;
++    const uint64_t ysize = static_cast<uint64_t>(ystride) * height;
++    const uint64_t csize = cstride * (height / 2);
++    if (ysize > UINT32_MAX || csize > UINT32_MAX)
++        return false;
++    const uint64_t required = ysize + 2 * csize;
++    if (required > allocation_size || required > UINT32_MAX)
++        return false;
++    planes[0] = {ystride, 0, static_cast<uint32_t>(ysize)};
++    planes[1] = {static_cast<uint32_t>(cstride), static_cast<uint32_t>(ysize),
++                 static_cast<uint32_t>(csize)};
++    planes[2] = {static_cast<uint32_t>(cstride), static_cast<uint32_t>(ysize + csize),
++                 static_cast<uint32_t>(csize)};
++    return true;
++}
++#endif
++
++bool cros_gralloc_get_plane_layout(cros_gralloc_handle_t hnd, uint32_t plane,
++                                   cros_gralloc_plane_layout *layout)
++{
++    if (!hnd || !layout || plane >= hnd->num_planes || plane >= DRV_MAX_PLANES)
++        return false;
++#ifdef MT6580_UTGARD_HANDLE
++    if (hnd->format == DRM_FORMAT_YVU420_ANDROID) {
++        cros_gralloc_plane_layout planes[3];
++        if (hnd->num_planes != 3 ||
++            !cros_gralloc_yv12_layout(hnd->width, hnd->height, hnd->strides[0],
++                                      hnd->sizes[0], planes))
++            return false;
++        *layout = planes[plane];
++        return true;
++    }
++    if (hnd->num_planes != 1 || plane != 0)
++        return false;
++#endif
++    *layout = {hnd->strides[plane], hnd->offsets[plane], hnd->sizes[plane]};
++    return true;
++}
++
  cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
  {
-+	if (!handle || handle->version != sizeof(native_handle_t))
+-	if (sizeof(native_handle_t) + (sizeof(int) * (handle->numFds + handle->numInts)) !=
++	if (!handle || handle->version != sizeof(native_handle_t) ||
++            handle->numFds < 0 || handle->numInts < 0)
 +		return nullptr;
 +
- 	if (sizeof(native_handle_t) + (sizeof(int) * (handle->numFds + handle->numInts)) !=
++	if (sizeof(native_handle_t) + (sizeof(int) * (static_cast<uint64_t>(handle->numFds) + handle->numInts)) !=
  	    sizeof(struct cros_gralloc_handle))
  		return nullptr;
-@@ -193,11 +196,20 @@ cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
+ 
+@@ -193,11 +244,39 @@ cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle)
  	if (!hnd || hnd->magic != cros_gralloc_magic)
  		return nullptr;
  
 +#ifdef MT6580_UTGARD_HANDLE
-+ if (hnd->numFds != 2 || hnd->numInts != 37 || hnd->num_planes != 1 ||
++ if (hnd->numFds != 2 || hnd->numInts != 37 ||
++     (hnd->num_planes != 1 && hnd->num_planes != 3) ||
 +     !hnd->reserved_region_size || hnd->fds[0] < 0 || hnd->fds[1] < 0 ||
 +     hnd->stock_magic != 0x03141592 || hnd->stock_flags != 4 ||
 +     hnd->format_modifier != 0 || !hnd->sizes[0] || hnd->offsets[0] != 0)
 +  return nullptr;
++ if (hnd->format == DRM_FORMAT_YVU420_ANDROID) {
++  cros_gralloc_plane_layout planes[3];
++  if (hnd->num_planes != 3 || hnd->droid_format != HAL_PIXEL_FORMAT_YV12 ||
++      hnd->tiling != 0 ||
++      !cros_gralloc_yv12_layout(hnd->width, hnd->height, hnd->strides[0],
++                                hnd->sizes[0], planes) ||
++      hnd->stock_size != hnd->sizes[0] || hnd->stock_width != hnd->width ||
++      hnd->stock_height != hnd->height || hnd->stock_format != HAL_PIXEL_FORMAT_YV12 ||
++      hnd->stock_pixel_stride != hnd->strides[0] ||
++      hnd->pixel_stride != hnd->strides[0] ||
++      hnd->stock_allocation_height != hnd->height ||
++      hnd->reserved_region_size > SIZE_MAX ||
++      hnd->total_size != hnd->reserved_region_size + hnd->sizes[0] ||
++      hnd->total_size < hnd->reserved_region_size)
++   return nullptr;
++ } else if (hnd->num_planes != 1) {
++  return nullptr;
++ }
 +#else
  	// if hnd->reserved_region_size == 0, handle->numFds is hnd->num_planes
  	// if hnd->reserved_region_size > 0, handle->numFds is hnd->num_planes + 1
@@ -560,8 +720,33 @@ index b18277c..411be3c 100644
  	return hnd;
  }
  
+diff --git a/cros_gralloc/cros_gralloc_helpers.h b/cros_gralloc/cros_gralloc_helpers.h
+index ba024d7..63f297f 100644
+--- a/cros_gralloc/cros_gralloc_helpers.h
++++ b/cros_gralloc/cros_gralloc_helpers.h
+@@ -66,6 +66,20 @@ uint32_t cros_gralloc_convert_map_usage(uint64_t usage);
+ 
+ cros_gralloc_handle_t cros_gralloc_convert_handle(buffer_handle_t handle);
+ 
++// Physical plane order follows DRM YVU420: Y, Cr, Cb. All share one image FD.
++struct cros_gralloc_plane_layout {
++    uint32_t stride;
++    uint32_t offset;
++    uint32_t size;
++};
++#ifdef MT6580_UTGARD_HANDLE
++bool cros_gralloc_yv12_layout(uint32_t width, uint32_t height, uint32_t ystride,
++                            uint32_t allocation_size,
++                            cros_gralloc_plane_layout planes[3]);
++#endif
++bool cros_gralloc_get_plane_layout(cros_gralloc_handle_t hnd, uint32_t plane,
++                                   cros_gralloc_plane_layout *layout);
++
+ int32_t cros_gralloc_sync_wait(int32_t fence, bool close_fence);
+ 
+ std::string get_drm_format_string(uint32_t drm_format);
 diff --git a/cros_gralloc/gralloc0/gralloc0.cc b/cros_gralloc/gralloc0/gralloc0.cc
-index 8f97b21..f307dcc 100644
+index 8f97b21..3de33e1 100644
 --- a/cros_gralloc/gralloc0/gralloc0.cc
 +++ b/cros_gralloc/gralloc0/gralloc0.cc
 @@ -146,7 +146,8 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
@@ -638,6 +823,96 @@ index 8f97b21..f307dcc 100644
  }
  
  static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buffer_handle_t handle,
+@@ -455,7 +469,9 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
+ 	uint32_t map_flags;
+ 	uint32_t strides[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
+ 	uint32_t offsets[DRV_MAX_PLANES] = { 0, 0, 0, 0 };
++#ifndef MT6580_UTGARD_HANDLE
+ 	uint64_t format_modifier = 0;
++#endif
+ 	uint8_t *addr[DRV_MAX_PLANES] = { nullptr, nullptr, nullptr, nullptr };
+ 	auto const_module = reinterpret_cast<const struct gralloc0_module *>(module);
+ 	auto mod = const_cast<struct gralloc0_module *>(const_module);
+@@ -486,16 +502,51 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
+ 		return -EINVAL;
+ 	}
+ 
++#ifndef MT6580_UTGARD_HANDLE
+ 	assert(l >= 0);
+ 	assert(t >= 0);
+ 	assert(w >= 0);
+ 	assert(h >= 0);
++#endif
+ 
+ 	map_flags = cros_gralloc_convert_map_usage(static_cast<uint64_t>(usage));
++#ifdef MT6580_UTGARD_HANDLE
++ // Old Mali's matching unlock always uses legacy_unlock. Use the same
++ // ownership/cache path for YCbCr rather than leaving a modern lock behind.
++ ret = cros_gralloc_sync_wait(fence_fd, true);
++ if (ret) return ret;
++ if (!ycbcr || hnd->format != DRM_FORMAT_YVU420_ANDROID || l < 0 || t < 0 ||
++     w < 0 || h < 0 || static_cast<uint64_t>(rect.x) + rect.width > hnd->width ||
++     static_cast<uint64_t>(rect.y) + rect.height > hnd->height)
++  return -EINVAL;
++ for (uint32_t plane = 0; plane < hnd->num_planes; ++plane) {
++  cros_gralloc_plane_layout layout;
++  if (!cros_gralloc_get_plane_layout(hnd, plane, &layout)) return -EINVAL;
++  strides[plane] = layout.stride;
++  offsets[plane] = layout.offset;
++ }
++ void *base = nullptr;
++ ret = mod->driver->legacy_lock(handle, map_flags, &base);
++ if (ret) return ret;
++ for (uint32_t plane = 0; plane < hnd->num_planes; ++plane)
++  addr[plane] = map_flags ? static_cast<uint8_t *>(base) + offsets[plane] :
++      reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(offsets[plane]));
++ memset(ycbcr, 0, sizeof(*ycbcr));
++#else
+ 	ret = mod->driver->lock(handle, fence_fd, true, &rect, map_flags, addr);
+ 	if (ret)
+ 		return ret;
+ 
++ if (map_flags) {
++  for (uint32_t plane = 0; plane < hnd->num_planes; ++plane) {
++   cros_gralloc_plane_layout layout;
++   if (!cros_gralloc_get_plane_layout(hnd, plane, &layout)) {
++    mod->driver->unlock(handle, &fence_fd);
++    return -EINVAL;
++   }
++   strides[plane] = layout.stride;
++  }
++ }
+ 	if (!map_flags) {
+ 		ret = mod->driver->resource_info(handle, strides, offsets, &format_modifier);
+ 		if (ret)
+@@ -506,13 +557,14 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
+ 			    reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(offsets[plane]));
+ 	}
+ 
++#endif
+ 	switch (hnd->format) {
+ 	case DRM_FORMAT_NV12:
+ 		ycbcr->y = addr[0];
+ 		ycbcr->cb = addr[1];
+ 		ycbcr->cr = addr[1] + 1;
+-		ycbcr->ystride = (!map_flags) ? strides[0] : hnd->strides[0];
+-		ycbcr->cstride = (!map_flags) ? strides[1] : hnd->strides[1];
++		ycbcr->ystride = strides[0];
++		ycbcr->cstride = strides[1];
+ 		ycbcr->chroma_step = 2;
+ 		break;
+ 	case DRM_FORMAT_YVU420:
+@@ -520,8 +572,8 @@ static int gralloc0_lock_async_ycbcr(struct gralloc_module_t const *module, buff
+ 		ycbcr->y = addr[0];
+ 		ycbcr->cb = addr[2];
+ 		ycbcr->cr = addr[1];
+-		ycbcr->ystride = (!map_flags) ? strides[0] : hnd->strides[0];
+-		ycbcr->cstride = (!map_flags) ? strides[1] : hnd->strides[1];
++		ycbcr->ystride = strides[0];
++		ycbcr->cstride = strides[1];
+ 		ycbcr->chroma_step = 1;
+ 		break;
+ 	default:
 diff --git a/cros_gralloc/gralloc4/CrosGralloc4Allocator.cc b/cros_gralloc/gralloc4/CrosGralloc4Allocator.cc
 index 852df88..59ebff6 100644
 --- a/cros_gralloc/gralloc4/CrosGralloc4Allocator.cc
@@ -673,7 +948,7 @@ index b74ed99..ababf0d 100644
  
  void drv_preload(bool load)
 diff --git a/dumb_driver.c b/dumb_driver.c
-index 98c9ba7..f9c7cdd 100644
+index 98c9ba7..a813c69 100644
 --- a/dumb_driver.c
 +++ b/dumb_driver.c
 @@ -5,6 +5,9 @@
@@ -686,7 +961,19 @@ index 98c9ba7..f9c7cdd 100644
  
  #include "drv_helpers.h"
  #include "drv_priv.h"
-@@ -82,3 +85,32 @@ INIT_DUMB_DRIVER(rockchip)
+@@ -49,6 +52,11 @@ static int dumb_driver_init(struct driver *drv)
+ 			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER |
+ 				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+ 	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
++#ifdef MT6580_UTGARD_HANDLE
++ // Codec2 writes decoded planar YV12; display composition still uses textures.
++ drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &LINEAR_METADATA,
++                        BO_USE_HW_VIDEO_DECODER);
++#endif
+ 
+ 	return drv_modify_linear_combinations(drv);
+ }
+@@ -82,3 +90,32 @@ INIT_DUMB_DRIVER(rockchip)
  #ifndef DRV_MEDIATEK
  INIT_DUMB_DRIVER(mediatek)
  #endif

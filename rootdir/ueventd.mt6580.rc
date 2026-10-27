@@ -3,7 +3,7 @@
 /dev/dri/card*             0666 system graphics
 /dev/dri/renderD*          0666 system graphics
 /dev/mali                  0666 system graphics
-/dev/dma_heap/system       0660 system graphics
+# DMA heaps inherit AOSP 0444 system:system for app MediaCodec allocation.
 /dev/watchdog              0600 root root
 /dev/watchdog0             0600 root root
 /dev/block/mmcblk0p*       0600 root root
@@ -11,3 +11,6 @@
 # drm_hwcomposer uses the standard backlight sysfs controller.
 /sys/devices/platform/backlight/backlight/backlight brightness 0664 system graphics
 /sys/devices/platform/backlight/backlight/backlight bl_power 0664 system graphics
+
+# Only the separately privileged worker can use this CAP_SYS_RAWIO UAPI.
+/dev/mt6580-vcodec          0660 mediacodec mediacodec

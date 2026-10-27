@@ -82,3 +82,14 @@ PRODUCT_COPY_FILES += \
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/keylayout/a1260-remote.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/a1260-remote.kl
+
+# The Android C2 frontend exchanges copied frames with a separate ARM32 worker.
+# Original Android 8 platform dependencies stay inside its private directory.
+$(call inherit-product, vendor/aic/a1260-codec/vcodec-vendor.mk)
+PRODUCT_PACKAGES += \
+    android.hardware.media.c2-service.mt6580 \
+    mt6580-codec-worker \
+    a1260-codec2-seccomp-ext \
+    media_codecs_mt6580
+# Select the AIDL C2 stores for both the vendor decoder and software fallback.
+PRODUCT_VENDOR_PROPERTIES += media.c2.hal.selection=aidl

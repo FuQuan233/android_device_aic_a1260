@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MediaCodecs>
+    <!-- Software codecs remain supplied by the media.swcodec APEX. No secure,
+         tunneled or adaptive-playback feature is advertised here. -->
+    <Decoders>
+        <MediaCodec name="c2.mt6580.avc.decoder" type="video/avc" rank="256">
+            <Limit name="size" min="16x16" max="1280x720" />
+            <Limit name="alignment" value="2x2" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="blocks-per-second" range="1-108000" />
+            <Limit name="bitrate" range="1-14000000" />
+            <Limit name="concurrent-instances" max="1" />
+        </MediaCodec>
+    </Decoders>
+</MediaCodecs>

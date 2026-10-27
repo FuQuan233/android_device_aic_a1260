@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_library_static {
+    name: "libcodec2_mt6580_avcdec",
+    vendor: true,
+    compile_multilib: "32",
+    defaults: ["libcodec2-impl-defaults"],
+    srcs: ["C2Mt6580AvcDec.cpp", "Mt6580ComponentStore.cpp", "LegacyClient.cpp"],
+    export_include_dirs: ["."],
+    shared_libs: [
+        "libcodec2_soft_common",
+        "libsfplugin_ccodec_utils",
+        "libstagefright_foundation",
+        "libcutils",
+    ],
+    header_libs: ["libarect_headers", "libnativewindow_headers"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+cc_binary {
+    name: "android.hardware.media.c2-service.mt6580",
+    vendor: true,
+    compile_multilib: "32",
+    relative_install_path: "hw",
+    defaults: ["libcodec2-aidl-V2-defaults", "libcodec2-impl-defaults"],
+    srcs: ["service.cpp"],
+    static_libs: ["libcodec2_mt6580_avcdec"],
+    shared_libs: [
+        "libavservices_minijail",
+        // Shared dependencies of the static component are linked explicitly.
+        "libcodec2_soft_common",
+        "libsfplugin_ccodec_utils",
+        "libstagefright_foundation",
+        "libcutils",
+    ],
+    init_rc: ["android.hardware.media.c2-service.mt6580.rc"],
+    vintf_fragments: ["manifest_media_c2_mt6580.xml"],
+    required: ["android.hardware.media.c2-default-seccomp_policy"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+prebuilt_etc {
+    name: "media_codecs_mt6580",
+    vendor: true,
+    src: "media_codecs.xml",
+    filename: "media_codecs.xml",
+}
+cc_binary {
+    name: "mt6580-codec-worker",
+    vendor: true,
+    compile_multilib: "32",
+    srcs: ["worker.c"],
+    shared_libs: ["libdl"],
+    init_rc: ["mt6580-codec-worker.rc"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+prebuilt_etc {
+    name: "a1260-codec2-seccomp-ext",
+    vendor: true,
+    src: "codec2.vendor.ext.policy",
+    filename: "codec2.vendor.ext.policy",
+    sub_dir: "seccomp_policy",
+}

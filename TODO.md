@@ -1,6 +1,6 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 boot-vcodec-shared-final.img（内核 #178，新增真实解码缓冲桥及 ARM32 同组 DMA 映射；已有 LARB1/ISP、显示 M4U/SMI；继承 #165 HACC、#161 MCUSYS/BIU、#157 PWRAP 恢复及既有完整 deep）。保留软件 AES 默认优先级、普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0。电芯模型实际标定、供电接线/电流实测、编解码/TRNG及外围功能仍按下列清单处理；USB 大传输按用户要求暂缓。
+当前标准镜像为 boot-vcodec-poll.img（内核 #182，已接 Android H264 硬解、真实任务/IRQ、解码缓冲桥及 ARM32 同组 DMA 映射；已有 LARB1/ISP、显示 M4U/SMI；继承 #165 HACC、#161 MCUSYS/BIU、#157 PWRAP 恢复及既有完整 deep）。保留软件 AES 默认优先级、普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0。电芯模型实际标定、供电接线/电流实测、编解码/TRNG及外围功能仍按下列清单处理；USB 大传输按用户要求暂缓。
 
 ## 当前剩余项核对（2026-10-27）
 
@@ -182,3 +182,21 @@ SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完�
 **#178 解码缓冲准备**：增加root/CAP_SYS_RAWIO受限/dev/mt6580-vcodec，真实DMA-BUF导入及coherent分配/mmap，每file拥有不复用id；VMA跨fork/RELEASE/close仍存活，最后unmap才释放及扣64MiB配额。LARB1端口3/9/10声明为codec内存消费者，未开VCODEC功能门控/IRQ，也未创建伪成功/dev/Vcodec。#171发现ARM32 per-device attach拒绝同group双设备并回退物理DMA，连续IOVA检查安全拒绝；现用ARM私有group缓存共享页表和IOVA bitmap、最后成员detach，保留单设备及detach+release引用语义。#174/#175进一步发现core正常DMA ownership只认identity默认域，第二消费者在probe前EBUSY；严格识别ARM自动安装的UNMANAGED域/真实DMAops，保留owner/PASID及记账，不用driver_managed_dma绕过。#176/#177的coherent mmap guard误拒默认空vm_ops，最终放行此默认但仍拒后端私有处理。失败日志保留。#178真实2MiB import、8KiB coherent及跨fd/重复释放/超长mmap/fork/释放后VMA检查通过，live全0；四种VAL内存、低32位union兼容、MVA范围/缓存接口通过，原厂H264库实际Create/Release32轮及32个864B分配日志，live再回0。仅私有进程，不替换系统/vendor库；尚未Init或提交码流。后续仍是Vcodec锁/OAL共享区及IRQ/任务/cache所有权，真实码流出帧后再接Android媒体组件。动态group变化、异构DMA aperture、其他ARM板手动attach/teardown及真实decoder DMA未资格化。详见内核mt6580-vcodec-buffers.rst和out/a1260-runtime-pm/vcodec-next。
 
 #178回归补充：两轮完整deep停钟8.892298497/9.052424153秒，CPU0/L2 cold2，8MiB RAM一致；第二轮因alarmtimer临近系统闹钟-EBUSY取消一次后重试通过，success/fail2/1，不记成零取消。四轮LARB1 runtime开关、MMU608及VC/11个OSTD恢复通过，codec gate仍关；随后native及stock32轮再过、累计alloc4/import72/mmap6而live全0。Mali1820帧/绿像素/GL0，4MiB对齐eMMC写+两读一致、8-bit52MHz/error0；M4U fault/timeout0、RDMA欠流/异常0、taint0，MD1/ISP/DISP/MFG均off。未跨deep持有独立codec缓冲，不将其冒充decoder DMA或IRQ验证。标准产物同步#178，临时探针/旧库/锁/闹钟清理，默认普通shell/四核/schedutil/604500..1300000/default deep/stay-on0保留。完整dt-schema工具不可用，仅YAML语法及实际kernel/DTB构建通过。
+
+
+硬解进行中（开发内核 #182，标准产物仍 #178）：真实 H264 已出帧。
+#181 native 8 帧 exact I420+8 IRQ；独立 worker 20轮 reset/EOS 的160帧及两轮连续128帧完全一致，累计432 jobs/IRQs、无超时、live0。
+#182 修复 WAIT(0) 误取消任务，空锁轮询返回 EAGAIN、显式取消/真实ISP OFF检查通过；该1次取消为刻意检查，不是解码超时。
+随后1280×720 Baseline实际切双线程XB库，8帧像素/token/PTS一致、8 IRQ/timeouts0/live0。
+Codec2 AIDL V2 前端/独立worker及私有原厂库打包已写入源码，正在构建；尚未确认 Android MediaCodec 枚举/输出/Surface/seek。
+原厂 DRVB 只改旧dev_info路径以读取同机真实 efuse，保留检查代码；原厂库/efuse不入git。
+原始配置未设置真实Linux TID、缺libmmprofile、DRVB毒栈、mmap缺FOP_UNSIGNED_OFFSET和缺辅助寄存器资源的失败日志均保留在vcodec-next，不将其算作成功出帧。
+
+
+## Android 硬解接入完成（#182，2026-10-28）
+
+Codec2 AIDL V2 注册 c2.mt6580.avc.decoder，普通 shell/应用可自动选择硬件组件；前端和原厂后端分进程，worker 是 mediacodec + CAP_SYS_RAWIO。原厂库仅在私有目录，保留真实 devinfo 校验；补齐 libstdc++ 私有依赖及 init socket 环境变量规范。minigbm 保留168字节/2FD原厂句柄，增加单 DMA-BUF 三逻辑平面的 YV12 和边界检查；不冒充 YUV 直接扫描。修复旧设备 ueventd 0660 覆盖导致普通应用与音频服务不能分配 system heap，恢复 AOSP 0444；VAL 打开 heap 改 O_RDONLY，DMA-BUF 仍由 ioctl 返回可写 FD。
+
+实际 Android MediaCodec：128×96 和1280×720 各48帧均逐像素匹配独立 libavc I420 参考，PTS、flush、携数据/空 EOS、stop/configure/start、两次实例释放通过；自动选择硬件且保留软件解码器。SurfaceTexture→Mali-400 MP external texture→GPU 回读8帧变化及时间戳通过。累计104个硬件任务/104次真实IRQ，超时/取消/故障/供电错误0，live VMA/缓冲/字节全0。此前失败记录保留，不以 Java 异常退出137冒充内核崩溃。产物统一 #182 boot/kernel 与新 vendor，system 不需更新。
+
+当前仅单实例、逐行 H264 Baseline/ConstrainedBaseline ≤720p；Main/High、交错、其他视频格式、完整应用 seek/动态分辨率及跨 deep 保留解码任务未验证。帧通过显式 CPU 拷贝转移，未宣称零拷贝或实际帧率。详情见 README、media/、内核 mt6580-vcodec-buffers.rst 及 out/a1260-runtime-pm/vcodec-next。

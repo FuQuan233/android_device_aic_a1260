@@ -1,0 +1,17 @@
+# Legacy binary decoder stays outside the Android media/C2 process.
+type mt6580_codec_worker, domain;
+type mt6580_codec_worker_exec, exec_type, vendor_file_type, file_type;
+type mt6580_vcodec_device, dev_type;
+type mt6580_vcodec_socket, file_type;
+init_daemon_domain(mt6580_codec_worker)
+allow mt6580_codec_worker mt6580_vcodec_device:chr_file { rw_file_perms map };
+allow mt6580_codec_worker vendor_file:dir r_dir_perms;
+allow mt6580_codec_worker vendor_file:file { r_file_perms execute map };
+allow mt6580_codec_worker dmabuf_system_heap_device:chr_file rw_file_perms;
+allow mt6580_codec_worker self:unix_stream_socket create_stream_socket_perms;
+allow mt6580_codec_worker mt6580_vcodec_socket:sock_file { read write getattr setattr };
+get_prop(mt6580_codec_worker, vendor_default_prop)
+# Raw MMIO is the temporary hybrid bring-up interface, permitted only on debug
+# builds. A production port needs a validated register-command kernel interface.
+userdebug_or_eng(`allow mt6580_codec_worker self:capability sys_rawio;')
+unix_socket_connect(mediacodec, mt6580_vcodec, mt6580_codec_worker)

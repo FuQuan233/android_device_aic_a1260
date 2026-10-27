@@ -1,0 +1,11 @@
+# The C2 frontend exchanges copied access units and I420 frames with the
+# separately privileged legacy decoder worker over a local Unix socket.
+# The frontend never opens VDEC MMIO or receives raw DMA mappings.
+socket: arg0 == 1
+connect: 1
+setsockopt: 1
+sendto: 1
+recvfrom: 1
+shutdown: 1
+# Graphic/native-handle imports duplicate owned descriptors with CLOEXEC.
+fcntl64: 1
