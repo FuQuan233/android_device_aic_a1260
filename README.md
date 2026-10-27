@@ -77,7 +77,7 @@ timekeeping stalls observed with virtual timers on this firmware.
 Hardware verifies all four CPUs online, local timer interrupts, correct
 shared atomic updates, monotonic time across CPU migrations and 3.98-way
 parallel execution. CPU hot-unplug, shared CPU frequency scaling and light s2idle have since been implemented; see the CPU power-management notes in TODO.md.
-SELinux is permissive during bring-up. Debug bring-up builds select root ADB at initial daemon startup; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
+SELinux is permissive during bring-up. Normal userdebug startup uses ADB shell with on-demand `adb root`; the physical UART retains early kernel logs. The watchdog service keeps the 30-second hardware watchdog alive.
 The Android image exposes only FunctionFS/ADB, without ACM or ttyGS0.
 USB ADB enumeration and root shell are verified; large bulk transfers remain unreliable.
 The fs action configures 512 MiB of logical LZ4 zram swap before ART starts.
@@ -430,5 +430,32 @@ deep pauses the owned controls before the PLL/mux transition and restores
 them in the finisher. Seven OPPs, SMP/hotplug, three deep resumes and
 post-resume graphics/direct storage passed; no late DCM repair was needed.
 The normal backup confirms MCUSYS default ON is a no-op, so MCUSYS/L2 and
-memory DCM remain unmodified. Runtime cpuidle is still WFI, and electrical
-savings have not been measured. See the kernel's `mt6580-dcm.rst`.
+memory DCM remain unmodified. Four online CPUs continue to use WFI/DCM;
+electrical savings have not been measured. See `mt6580-dcm.rst`.
+
+## CPU0 runtime dormant
+
+Build #150 adds a separate BSP 688-word deep-idle PCM, matched against the
+normal device kernel backup. It admits CPU0 only after the other CPUs,
+display and GPU are off; hotplug disables the state before bringing a
+secondary online. The initial profile retains L2, infra, DDR and PLLs and
+bounds each PCM residency to 20 ms. The four-core default is unchanged.
+There is no automatic hotplug or MT6580 multicore MCDI implementation.
+
+The WFI-abort fix captures ACTLR with volatile assembly before clearing
+SMP: Clang previously delayed the non-volatile read until the return path,
+leaving coherency disabled after an interrupted entry. Cortex-A7 erratum
+814220 and the BSP L1-flush/L2-clean policy are also applied. Temporary
+persistent markers, redundant GIC restoration and the explicit qualification
+sysfs write interface have been removed.
+
+#148 passed 528 actual resets and 46 WFI aborts; cleaned #149 reached 438
+resets/28 aborts. Final #150 passed 83 resets/five aborts with ordinary menu
+governor and automatic state admission, then restored four-core coherence.
+RAM hashes and timer deadlines passed. See `mt6580-cpuidle.rst` and
+`out/a1260-runtime-pm/dormant` for evidence and electrical-measurement limits.
+
+The same final image passed two complete system-deep cycles, with RAM,
+DCM/PWRAP restoration, Mali rendering/readback, aligned direct eMMC I/O and
+four-core/clock-migration checks afterward. Product `boot.img`/`kernel` use
+`boot-dormant.img`/`kernel-dormant`; ordinary ADB remains shell.
