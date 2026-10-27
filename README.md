@@ -517,3 +517,14 @@ errors were zero; default Windows ADB reconnected automatically. Standard
 boot/kernel now use #161, ordinary shell and normal power policy retained.
 Physical power/current and failure injection are still unmeasured. See
 `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-mcusys-dcm.rst`.
+
+Build #165 adds the HACC software-key AES ECB/CBC provider, with queued
+requests, bounded polling, key/data clearing and runtime/system PM. Full
+crypto selftests on #164 and14400 concurrent comparison pairs across two
+deep intervals on #165 passed, followed by1203 CPU0 idle restores and
+RAM/GPU/direct-I/O checks. PIO measured slower than generic software AES;
+priority50 keeps software preferred. Hardware-bound keys and TRNG are not
+exposed. Standard boot/kernel are #165; temporary tests are removed and
+ordinary ADB shell/four cores/default deep retained. See
+`kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-hacc.rst` for evidence,
+the separately recorded freeze cancellation and remaining limits.
