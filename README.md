@@ -31,6 +31,12 @@ architecture policy exits are relaxed, while real BPF syscall, program/map
 loading and verifier failures remain fatal. Network functionality and ABI
 compatibility still require hardware testing; this is not VTS compliance.
 
+Apply `health-loop-drain-before-rearm.patch` from `hardware/interfaces`.
+The health event loop must drain ready timerfd expirations before resetting
+its slow wake timer; otherwise timerfd_settime clears the count before read.
+The patch also retries interrupted reads and accepts a stale nonblocking
+read when another event in the batch changed the charger interval.
+
     export OUT_DIR=out SOONG_NINJA=ninja GOGC=25 GOMEMLIMIT=22GiB
     source build/envsetup.sh
     lunch lineage_a1260-cp2a-userdebug
