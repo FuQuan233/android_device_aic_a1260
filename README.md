@@ -413,8 +413,19 @@ cipher and CRC setup. Normal startup retains a working firmware link. A
 qualification boot reconstructed the link from reset (window 0x0000ff,
 center 3), preserved VPROC, and passed seven CPU OPPs and three deep resumes.
 The ordinary image contains no force-init parameter. Bootstrap supplies/pins
-and complete online fault-reset handling remain separate requirements.
+remain dependent on earlier firmware; online recovery is described below.
 See `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-pwrap-link.rst`.
+
+Builds #156/#157 add bounded online recovery with the old MT6580 SPI108 error
+IRQ, public regmap access exclusion and serialization against SPM sleep
+voltage/command ownership. It preserves eight autonomous slots and saved
+AP configuration, reconstructs only the serial protocol, compares readable
+VPROC snapshots, and never retries a failed original command. Three live
+reconstructions, a soft inspection, seven OPPs, two complete deep resumes,
+GPU/concurrent RTC access, aligned direct eMMC I/O and four-CPU checks passed.
+One concurrent RTC read was explicitly rejected during reconstruction and
+later reads recovered. Actual physical bus/CRC/error-IRQ injection remains
+unqualified. See the kernel PWRAP document and runtime summary for limits.
 
 The same build retains the bounded USB enumeration guard through RESET and
 renews it for an unconfigured SUSPEND. Five screen-off root/unroot switches
@@ -481,3 +492,16 @@ See `mt6580-memory-dcm.rst` and `out/a1260-runtime-pm/memory-dcm/summary.json`.
 Final cleanup also allowed an automatic 55.747988563-second deep sleep;
 total suspend success/failure became3/0, EMI early pause/restore3/3 and
 DRAMC policy checks3/failures0, still with no late EMI repair.
+
+Host access note (2026-10-27): the current default port5037 ADB server runs
+on Windows. Leave the device attached to Windows for this workflow; USB/IP
+attachment into WSL transfers ownership away from that server. An empty
+ADB list after host reattachment is not by itself evidence of a kernel
+crash. Do not create another ADB server/port or request WSL attachment
+without first checking the current server's owner.
+
+The final standard boot/kernel are build #157, with masked/raw IRQ causes
+retained together. Normal shell boot, two live high/low OPP resets and one
+soft inspection were repeated on that final build. The preceding #156 also
+passed 1218 actual CPU0 dormant restores with RAM/four-CPU recovery. Root
+access was used on demand and restored to ordinary shell after testing.
