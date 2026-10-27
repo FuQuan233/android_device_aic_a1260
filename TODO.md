@@ -6,7 +6,7 @@
 
 以下为本次按实际 DTS、驱动和运行状态核对后的清单；后文带版本号的记录按时间保留，旧版“未实现”说明由后续验证覆盖。
 
-- **电量模型未与原厂等同，已登记后续处理**：当前仅参考旧 BSP 的 OAM 第二观察器，旧源码本身是移植版，不能据此认定与出厂算法/表格一致。1397 mAh、OCV/温度/内阻表尚未按实装电芯标定；睡眠阶段没有真实电流观测，不能把整夜 99%→99% 当作不耗电；跨重启 SOC、老化补偿尚未移植。后续先确认真实电芯与原厂参数，再做完整充放电/静置校准及状态恢复，暂不修改现有模型。
+- **电量参数与原机估算已恢复到源码，待上机（2026-10-27）**：用户确认电池铭牌1850 mAh / 3.7 V / 6.845 Wh，设计容量和能量已改；保持4.2 V充电上限及500 mA USB限流。从实机正常boot备份恢复4温度各102点OCV/R表和有效Qmax1600/1798/1838/1815 mAh，替换1397 mAh参考模型；双OAM/D2、五次阻抗迭代、30次温度窗口、整秒/0.1mAh积分、4mA固定睡眠估计和>1800秒较低HWOCV重标定已接。RTC_AL_HOU[14:8]通过同锁NVMEM保存UI，主线BQ真实Full继续作为充满依据；UI100反推BATFULL的旧充电服务不移植。整数零除/溢出及失败挂起导致UI快进做了明确防护。独立参考9742个state/154224个查表值及ASAN/UBSAN通过，内核/DT编译通过，尚未刷入验证；按需adb root后USB/IP附加掉了，等待重新附加。充电暂停恢复、RTC跨重启/闹钟并发及实际睡眠读数待实机核对。4mA仍不是实测，旧SW路径没有已确认生效的老化算法，移植原机曲线也不等于已重新标定老化电芯。详见内核Documentation/arm/mediatek/mt6350-stock-fuel-gauge.rst和out/a1260-runtime-pm/battery-stock-1850。
 - **临时默认 root 已移除**：device.mk 不再设置 service.adb.root=1，工具改为 tools/prepare_ramdisk.py，删除旧 ramdisk 的该属性并保留静态 fsck。当前打包默认 ramdisk-fsck.img，标准 boot-normal-adb.img 保留原 #121 内核及自动 deep；不更改 ro.secure、ADB 认证或 userdebug 按需 adb root 能力。实机重启后 uid=2000(shell)、service.adb.root 未设置、ro.secure=1、ro.debuggable=1、BOOT_COMPLETED=1；四核在线、schedutil/604500..1300000 kHz、默认 deep，SurfaceFlinger/activity 服务正常。证据 normal-adb-{startup,final,flash}.txt，产品目录 boot.img 已同步。
 
 SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完成）：

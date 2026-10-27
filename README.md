@@ -378,3 +378,20 @@ The tool removes the temporary property from
 checker, and optionally installs a new static ARM checker with
 `--e2fsck PATH`. Full builds retain `PRODUCT_PACKAGES += e2fsck_ramdisk`.
 The standard standalone pack configuration uses `ramdisk-fsck.img`.
+
+## Factory battery gauge and cell label
+
+The installed battery label is 1850 mAh, nominal 3.7 V, 6.845 Wh. The board
+now sets design charge/energy separately from the unchanged 4.2 V charge
+limit. Factory OAM D2 and the four original 102-point OCV/resistance curves
+were recovered from the working device boot backup, replacing the earlier
+1397 mAh reference model. Factory 25 C effective Qmax is 1838 mAh, distinct
+from nominal design capacity. Sleep uses the original fixed 4 mA estimate;
+that number is not a measured standby current.
+
+`CONFIG_NVMEM=y` and `CONFIG_RTC_NVMEM=y` preserve the original RTC SOC
+through a one-byte fixed-layout cell. RTC updates serialize with alarm writes
+and verify masked readback. Source provenance, algorithm/rounding, deliberate
+integration differences and validation limits are documented in
+`kernel/aic/mt6580/Documentation/arm/mediatek/mt6350-stock-fuel-gauge.rst`.
+Current on-device validation status is tracked in TODO.md.
