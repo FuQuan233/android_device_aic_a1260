@@ -544,3 +544,12 @@ boot/kernel now use #170; actual video codec DMA and Android integration
 remain pending. The isolated stock driver metadata query is not decoding. See
 `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-m4u.rst` for qualification
 scope and retained script failure.
+
+Build #178 prepares owned codec DMA-BUF/coherent buffers alongside display
+in the shared M4U group, with one ARM32 IOVA allocator and retained kernel DMA
+ownership. Native mapping/lifetime checks and 32 real stock H.264 instance
+Create/Release rounds pass in an isolated private process; live objects return
+to zero. No stock libraries are installed into the product. Actual decoder
+initialization, jobs/IRQ completion and Android hardware video decoding remain
+pending. See the kernel's mt6580-vcodec-buffers.rst for failure evidence and
+qualification scope. Standard boot/kernel now use #178.

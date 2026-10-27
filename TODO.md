@@ -1,6 +1,6 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 boot-larb1-fixed.img（内核 #170，新增 LARB1/ISP 门控、上下文和 SMI 握手依赖；已有显示 M4U/SMI 地址转换；继承 #165 HACC、#161 MCUSYS/BIU、#157 PWRAP 恢复及既有完整 deep）。保留软件 AES 默认优先级、普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0。电芯模型实际标定、供电接线/电流实测、编解码/TRNG及外围功能仍按下列清单处理；USB 大传输按用户要求暂缓。
+当前标准镜像为 boot-vcodec-shared-final.img（内核 #178，新增真实解码缓冲桥及 ARM32 同组 DMA 映射；已有 LARB1/ISP、显示 M4U/SMI；继承 #165 HACC、#161 MCUSYS/BIU、#157 PWRAP 恢复及既有完整 deep）。保留软件 AES 默认优先级、普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0。电芯模型实际标定、供电接线/电流实测、编解码/TRNG及外围功能仍按下列清单处理；USB 大传输按用户要求暂缓。
 
 ## 当前剩余项核对（2026-10-27）
 
@@ -178,3 +178,7 @@ SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完�
 #168最终诊断收尾：IOMMU sysfs改读缓存TTBR/配置标志，SMI改读上次请求掩码，避免诊断读取与页表/组件解绑时指针释放竞争；DMA数据路径和#166/#167通过的配置不变。最终普通启动及硬件状态复核，标准boot/kernel更新#168。
 
 **#170 LARB1/ISP补充**：接IMGSYS真实bits0/9门控、LARB1十一端口/十九寄存器上下文及M4U组件，按BSP编译选中的SMI_R配置COMMON+108=1001、VC2和11个OSTD1。不猜CAM/PLL父级；初始快照走完整runtime PM依赖。#169首轮deep后genpd noirq独立恢复ISP，但COMMON保持挂起，缺SMI源导致SRAM握手超时，第二轮退回保留供电；保留失败日志。#170在ISP域增加真实CLK_SMI握手引用后，两轮完整deep停钟9.488459386/9.595393211秒、CPU0/L2 cold2、8MiB RAM一致、success/fail2/0；四轮LARB1 runtime开关/VC/11个OSTD读回通过，ISP能off，VCODEC bit9未开、不冒充codec数据路径。Mali1802帧/绿像素/GL错误0，4MiB对齐eMMC写+两读一致、8-bit52MHz/error0，M4U fault/timeout0、RDMA欠流/异常0、taint0。原厂libvcodecdrv在临时私有目录可加载、chip query返回0x12/MT6580及格式元数据；未创建codec或提交解码。现代内核缺旧/dev/ion、/dev/Vcodec，后续需真实DMA-BUF→M4U映射、VAL/OAL锁和IRQ兼容，再验证真实码流并接Android媒体组件。临时旧库不写入系统。证据out/a1260-runtime-pm/vcodec和内核mt6580-larb1.rst；标准boot/kernel更新#170，普通shell及默认CPU/deep策略保留。
+
+**#178 解码缓冲准备**：增加root/CAP_SYS_RAWIO受限/dev/mt6580-vcodec，真实DMA-BUF导入及coherent分配/mmap，每file拥有不复用id；VMA跨fork/RELEASE/close仍存活，最后unmap才释放及扣64MiB配额。LARB1端口3/9/10声明为codec内存消费者，未开VCODEC功能门控/IRQ，也未创建伪成功/dev/Vcodec。#171发现ARM32 per-device attach拒绝同group双设备并回退物理DMA，连续IOVA检查安全拒绝；现用ARM私有group缓存共享页表和IOVA bitmap、最后成员detach，保留单设备及detach+release引用语义。#174/#175进一步发现core正常DMA ownership只认identity默认域，第二消费者在probe前EBUSY；严格识别ARM自动安装的UNMANAGED域/真实DMAops，保留owner/PASID及记账，不用driver_managed_dma绕过。#176/#177的coherent mmap guard误拒默认空vm_ops，最终放行此默认但仍拒后端私有处理。失败日志保留。#178真实2MiB import、8KiB coherent及跨fd/重复释放/超长mmap/fork/释放后VMA检查通过，live全0；四种VAL内存、低32位union兼容、MVA范围/缓存接口通过，原厂H264库实际Create/Release32轮及32个864B分配日志，live再回0。仅私有进程，不替换系统/vendor库；尚未Init或提交码流。后续仍是Vcodec锁/OAL共享区及IRQ/任务/cache所有权，真实码流出帧后再接Android媒体组件。动态group变化、异构DMA aperture、其他ARM板手动attach/teardown及真实decoder DMA未资格化。详见内核mt6580-vcodec-buffers.rst和out/a1260-runtime-pm/vcodec-next。
+
+#178回归补充：两轮完整deep停钟8.892298497/9.052424153秒，CPU0/L2 cold2，8MiB RAM一致；第二轮因alarmtimer临近系统闹钟-EBUSY取消一次后重试通过，success/fail2/1，不记成零取消。四轮LARB1 runtime开关、MMU608及VC/11个OSTD恢复通过，codec gate仍关；随后native及stock32轮再过、累计alloc4/import72/mmap6而live全0。Mali1820帧/绿像素/GL0，4MiB对齐eMMC写+两读一致、8-bit52MHz/error0；M4U fault/timeout0、RDMA欠流/异常0、taint0，MD1/ISP/DISP/MFG均off。未跨deep持有独立codec缓冲，不将其冒充decoder DMA或IRQ验证。标准产物同步#178，临时探针/旧库/锁/闹钟清理，默认普通shell/四核/schedutil/604500..1300000/default deep/stay-on0保留。完整dt-schema工具不可用，仅YAML语法及实际kernel/DTB构建通过。
