@@ -1,6 +1,6 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 boot-factory-battery-1850.img（内核 #126，第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
+当前标准镜像为 boot-mipi26m.img（内核 #127，第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
 
 ## 当前剩余项核对（2026-10-27）
 
@@ -11,7 +11,7 @@
 
 SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完成）：
 
-1. **共享电源与时钟依赖补全**。屏幕 panel-supply 仍是固定占位，触摸 I/O 轨及 VIO18/VIO28 全部消费者未确认；VEMC 保留常开。DSI engine/digital 物理父级、MPLL_D14 下游仍不明；MEMPLL/DDR 运行频率保留引导程序设置，未接运行时 DDR DVFS。先查旧驱动、原机资料和接线，明确消费者后才考虑门控/关轨。睡眠目标 0.85 V 与整机待机电流仍需仪表实测。
+1. **已补MIPI参考门控，保留物理供电未决项（#127）**。原机set_mipi26m及实机旧#126证实：TOP CG_CTRL0 bit4与AP_PLL_CON0 bit5在熄屏后仍开。已接dummy26m→TOP→AP→PHY PLL的真实CCF依赖，prepare/unprepare保持TOP先开/AP先关及PLL时序；CLK_IGNORE_UNUSED只保留LK交接前状态，正常最后消费者释放仍关。三轮显示开关实际门控Y/N/Y、计数1/0/1，RDMA欠流/异常0；物理自动deep停钟42.626483335秒，CPU0/L2 cold及MAINPLL off/on各1，SPM恢复error0，用户确认自行亮屏、画面触摸正常。首次freeze因bq24190-charger待唤醒取消，统计1成功/1freeze取消，设备挂起/恢复失败0；脚本screen_off采样延至唤醒后，不把其Y当作睡中观测。两个新gate读真实MMIO；老PLL通用硬件Y回退不作为PLL电源读回。MT6580不再读取其后端不使用的三字校准布局，其他平台不变。供电方面，旧所选触摸驱动与DT支持VGP1/2.8V，已接；其没有独立IOVCC消费，不等于必缺第二条可关轨。当前LK与用户Firmware_8.1/lk.bin仅7字节差异，相关LCM代码/表一致，三个power callbacks均0、检查过的上游wrapper无额外GPIO/LDO动作；panel实际轨及VIO18/VIO28全部消费者仍未确认，保留占位/常开。DSI engine/digital物理父级及D14未记载下游仍未知，保持保留策略；DDR PLL/运行时DVFS未接。记录见内核mt6580-mipi26m.rst、out/a1260-runtime-pm/{mipi26m/summary.json,panel-lk/findings-index.json}。产品boot.img/kernel已同步#127，默认ADB仍shell，无新增锁/闹钟；睡眠电压/待机电流尚需仪表测量。
 2. **PWRAP 独立初始化/故障恢复**。mt6580-pmic-wrap.c 仅接管固件初始化过的 WACS2，INIT_DONE 不存在就拒绝 probe；未实现冷初始化、重新校准采样/串行链路及完整异常恢复。当前 bootloader 路径已可读写并支持 PMIC 调压/关机，不等于脱离 LK 独立初始化。
 3. **pinctrl/EINT 剩余共享路由**。93 个引脚有 GPIO/IOCFG 描述，IRQ 仅 GPIO0..15 与专用 PMIC EINT17 路由可用；其余共享 EINT 映射未接入。应按未来 Wi-Fi/蓝牙/红外等真实消费者需求补齐，不替未使用引脚猜配置。
 4. **清醒时的省电路径**。cpuidle 只有 WFI 和同一硬件 WFI 的 s2idle 状态，尚无运行时多核协同 dormant/deep-idle；已验证的整机 suspend-to-RAM/deep 是另一条路径。CPU/总线/内存 DCM 没有完整接管策略，当前保留已知固件配置，I²C DCM 按 BSP 关闭；后续先做旧内核寄存器及依赖核对，再逐项资格化。

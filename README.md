@@ -395,3 +395,12 @@ and verify masked readback. Source provenance, algorithm/rounding, deliberate
 integration differences and validation limits are documented in
 `kernel/aic/mt6580/Documentation/arm/mediatek/mt6350-stock-fuel-gauge.rst`.
 Current on-device validation status is tracked in TODO.md.
+
+## MIPI reference-clock ownership
+
+Build #127 connects the MIPI PHY to the recovered MT6580 TOP/AP two-stage
+26 MHz reference route. Both gates close after the PHY powers down and
+reopen before PLL setup; display off/on and automatic deep/cable wake were
+verified on hardware. The default ADB policy remains ordinary userdebug.
+See `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-mipi26m.rst` for
+factory Evidence, current LK comparison and unresolved physical rail wiring.
