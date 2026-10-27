@@ -361,21 +361,20 @@ recovered without changes. The captured screenshot is normal, with zero
 RDMA underflows and abnormal events; the cause remains unconfirmed.
 The temporary suspend-prevention wake lock has been removed; the touch IRQ is disabled before hibernation so Android can enter standby without a spurious wake event.
 
-## Initial root ADB during bring-up
+## Normal userdebug ADB startup
 
-The eng/userdebug device profile temporarily sets `service.adb.root=1`, so
-obtaining root does not require restarting adbd and re-enumerating USB/IP.
-Remove this default selection before production. ADB authorization properties
-and keys are not changed by this setting.
+The temporary `service.adb.root=1` override was removed on 2026-10-27.
+ADB starts as shell on userdebug builds; `adb root` remains available on
+request. `ro.secure`, `ro.adb.secure` and authorization keys are unchanged.
 
-For an existing first-stage ramdisk, prepare a separate debug copy:
+To prepare an existing first-stage ramdisk while retaining its static fsck:
 
 ```sh
-python3 device/aic/a1260/tools/make_root_adb_ramdisk.py original-ramdisk debug-ramdisk
+python3 device/aic/a1260/tools/prepare_ramdisk.py input-ramdisk ramdisk-fsck.img
 ```
 
-Use `debug-ramdisk` as mkbootimg's ramdisk. The tool preserves the input,
-existing newc entries and properties, and adds only `service.adb.root=1` to
-`system/etc/ramdisk/build.prop`. Android 17 first-stage init preserves this
-file through the system mount for second-stage property loading. Build #90
-verified initial uid 0 without `adb root`, while `ro.secure` remained 1.
+The tool removes the temporary property from
+`system/etc/ramdisk/build.prop`, preserves the existing cpio entries and
+checker, and optionally installs a new static ARM checker with
+`--e2fsck PATH`. Full builds retain `PRODUCT_PACKAGES += e2fsck_ramdisk`.
+The standard standalone pack configuration uses `ramdisk-fsck.img`.

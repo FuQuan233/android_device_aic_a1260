@@ -1,6 +1,25 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 #121（第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
+当前标准镜像为 boot-normal-adb.img（内核仍 #121，第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
+
+## 当前剩余项核对（2026-10-27）
+
+以下为本次按实际 DTS、驱动和运行状态核对后的清单；后文带版本号的记录按时间保留，旧版“未实现”说明由后续验证覆盖。
+
+- **电量模型未与原厂等同，已登记后续处理**：当前仅参考旧 BSP 的 OAM 第二观察器，旧源码本身是移植版，不能据此认定与出厂算法/表格一致。1397 mAh、OCV/温度/内阻表尚未按实装电芯标定；睡眠阶段没有真实电流观测，不能把整夜 99%→99% 当作不耗电；跨重启 SOC、老化补偿尚未移植。后续先确认真实电芯与原厂参数，再做完整充放电/静置校准及状态恢复，暂不修改现有模型。
+- **临时默认 root 已移除**：device.mk 不再设置 service.adb.root=1，工具改为 tools/prepare_ramdisk.py，删除旧 ramdisk 的该属性并保留静态 fsck。当前打包默认 ramdisk-fsck.img，标准 boot-normal-adb.img 保留原 #121 内核及自动 deep；不更改 ro.secure、ADB 认证或 userdebug 按需 adb root 能力。实机重启后 uid=2000(shell)、service.adb.root 未设置、ro.secure=1、ro.debuggable=1、BOOT_COMPLETED=1；四核在线、schedutil/604500..1300000 kHz、默认 deep，SurfaceFlinger/activity 服务正常。证据 normal-adb-{startup,final,flash}.txt，产品目录 boot.img 已同步。
+
+SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完成）：
+
+1. **共享电源与时钟依赖补全**。屏幕 panel-supply 仍是固定占位，触摸 I/O 轨及 VIO18/VIO28 全部消费者未确认；VEMC 保留常开。DSI engine/digital 物理父级、MPLL_D14 下游仍不明；MEMPLL/DDR 运行频率保留引导程序设置，未接运行时 DDR DVFS。先查旧驱动、原机资料和接线，明确消费者后才考虑门控/关轨。睡眠目标 0.85 V 与整机待机电流仍需仪表实测。
+2. **PWRAP 独立初始化/故障恢复**。mt6580-pmic-wrap.c 仅接管固件初始化过的 WACS2，INIT_DONE 不存在就拒绝 probe；未实现冷初始化、重新校准采样/串行链路及完整异常恢复。当前 bootloader 路径已可读写并支持 PMIC 调压/关机，不等于脱离 LK 独立初始化。
+3. **pinctrl/EINT 剩余共享路由**。93 个引脚有 GPIO/IOCFG 描述，IRQ 仅 GPIO0..15 与专用 PMIC EINT17 路由可用；其余共享 EINT 映射未接入。应按未来 Wi-Fi/蓝牙/红外等真实消费者需求补齐，不替未使用引脚猜配置。
+4. **清醒时的省电路径**。cpuidle 只有 WFI 和同一硬件 WFI 的 s2idle 状态，尚无运行时多核协同 dormant/deep-idle；已验证的整机 suspend-to-RAM/deep 是另一条路径。CPU/总线/内存 DCM 没有完整接管策略，当前保留已知固件配置，I²C DCM 按 BSP 关闭；后续先做旧内核寄存器及依赖核对，再逐项资格化。
+5. **SoC 未接入功能块**。当前无 M4U/IOMMU、视频编解码、HACC 硬件加密接入；显示仍走物理地址、图形走已验证的 Mali。实机 hw_random 的 rng_available/rng_current 均为 none，crypto 为软件驱动；是否存在可用硬件 RNG、可复用何种 HACC 接口仍需先从旧源码确认，不能套用其他 SoC 的寄存器。eMMC 目前 8-bit/52 MHz，HS200/HS400 未验证，不以更高模式作为默认待办。
+6. **稳定性及边界验证**。高温临界关机未实测；GPU/内存长期压力、双指触摸仍未完成；USB 主机 bus-suspend/remote-wakeup 尚未完整资格化。大传输按用户要求暂缓，USB/IP 问题不能直接归因于控制器。
+7. **外围功能接入**。Wi-Fi、蓝牙/HCI HAL、物理音频仍未实现（当前音频为模拟输入/忽略输出）；原厂红外功能/特殊键应用动作、AW9106 LED 未接入。当前无 wlan 网络接口、声卡及视频节点，devices_deferred 为空；这只证明已声明设备没有挂起 probe，不代表缺失功能已完成。设备无基带和摄像头，产品继续 no-telephony/no-camera。
+
+本次核对证据：out/a1260-runtime-pm/soc-audit-before-normal-adb.txt，及当前 DTS、cpuidle-mt6580.c、mt6580-pmic-wrap.c、pinctrl-mt6580.c、clk-mt6580-*.c。CPU 四核、604.5–1300 MHz 调频、GPU/DISP 电源域、eMMC、PMIC 关机和自动 deep 已有实机记录；不因上述清单重新宣称整颗 SoC 已全部完成。
 
 ## 后续执行顺序（2026-10-24，用户确认）
 
@@ -133,7 +152,7 @@
 - 已验证的接线与修复依据：MT6350_IRQ_CHRDET=10 已定义，但 mt6350_devs 只创建 keys/battery/rtc，未注册 CHRDET 消费者；旧 BSP 的 CHR_CON0(0x0000)[5] 为 RGS_CHRDET、CHRSTATUS(0x0142)[4] 为 PCHR_CHRDET。物理插拔确认两位随 VBUS 变化后，已接 IRQ/wakeup/extcon；USB 依赖和绑定 gadget 关 PHY 尚未开放。
 - 物理停 26 MHz 的计时准备已在 #90 RTC-DT 完成：已声明 arm,no-tick-in-suspend 并验证 MT6350 RTC0 睡眠补偿，详见第 18 项。#96 已验证计数器停钟；#105 进一步用 PCM 32 kHz 补偿停钟区间，避免 RTC 秒级量化，见第 22 项。
 
-## 临时调试配置：首次 root ADB（2026-10-26）
+## 历史临时配置：首次 root ADB（2026-10-26，已于 10-27 移除）
 
-- #90 首次 ADB 连接即 uid 0，无需重启 adbd；ro.secure 仍为 1。为减少 USB/IP 因 adb root 重枚举丢附加，当前 bring-up ramdisk 在 Android 17 标准 `system/etc/ramdisk/build.prop` 中只增加 service.adb.root=1，由 first-stage init 复制给 second-stage 属性加载；工具不改 ro.secure/ro.adb.secure 或认证密钥。
-- 可重复生成工具：`tools/make_root_adb_ramdisk.py`；device.mk 仅 eng/userdebug 的后续完整系统构建设置此属性。**发布前移除此临时默认 root 选择，恢复普通调试启动策略**。当前打包工具默认使用 `out/a1260-runtime-pm/ramdisk-root-adb-fsck.img`；原始 ramdisk 和 `pack-base-before-root-adb.json` 保留。
+- #90 为减少 USB/IP 因 adb root 重枚举丢附加，曾在 first-stage ramdisk 的 system/etc/ramdisk/build.prop 及 eng/userdebug 产品配置增加 service.adb.root=1。ro.secure 始终为 1，认证密钥未改动。
+- 本次已移除默认 root，改用 tools/prepare_ramdisk.py 和 ramdisk-fsck.img；旧 ramdisk/pack JSON 仅保留作历史备份，不再作为打包默认值。第一阶段静态 fsck 保留，普通 userdebug 启动为 shell，按需 adb root 保持可用。

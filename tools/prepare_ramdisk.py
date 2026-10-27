@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Select root adbd at initial startup in the A1260 bring-up ramdisk.
+"""Prepare the A1260 first-stage ramdisk with normal userdebug ADB policy.
 
-Android 17 first-stage init copies system/etc/ramdisk/build.prop into
-second_stage_resources before mounting system. Boot-property loading preserves
-service.adb.root from there; userdebug adbd then need not restart to become root.
+Remove the temporary service.adb.root override from ramdisk build.prop.
 No ro.secure, ro.adb.secure or authorization-key setting is changed.
-Optionally install the static e2fsck_ramdisk binary so first-stage metadata
-checks can run before the system partition is available.
+Optionally install static e2fsck_ramdisk for first-stage filesystem checks;
+an existing checker is preserved if --e2fsck is not supplied.
 """
 import argparse
 import gzip
@@ -77,7 +75,6 @@ def make_ramdisk(src: bytes, e2fsck: bytes | None = None) -> bytes:
     comment = b"# Temporary A1260 bring-up: avoid a USB reset for adb root."
     lines = [line for line in prop.splitlines() if line != comment
              and line.partition(b"=")[0].strip() != b"service.adb.root"]
-    lines += [comment, b"service.adb.root=1"]
     add(target, stat.S_IFREG | 0o644, b"\n".join(lines) + b"\n")
     if e2fsck is not None:
         add(fsck_target, stat.S_IFREG | 0o755, e2fsck)
@@ -98,4 +95,4 @@ if __name__ == "__main__":
         parser.error("Keep the original ramdisk: input and output must differ")
     args.output.write_bytes(make_ramdisk(args.input.read_bytes(),
                                         args.e2fsck.read_bytes() if args.e2fsck else None))
-    print(f"Wrote debug ramdisk: {args.output}")
+    print(f"Wrote ramdisk: {args.output}")
