@@ -537,6 +537,10 @@ checks, display cycles, two deep sleeps and CPU0 idle/GPU/I/O recovery passed
 on #166. Final #167 adds port bounds and repeats boot/buffer/scanout/power
 checks. Final #168 uses cached diagnostics during teardown; standard boot/kernel
 are #168 with ordinary shell/default CPU/deep
-policy retained. LARB1 and hardware video decoding are still pending. See
+policy retained. Build #170 subsequently adds LARB1/ISP gating, eleven-port
+context and the real SMI source for ISP SRAM handshakes. Two deep and four
+runtime power cycles passed with GPU/eMMC/display regressions. Standard
+boot/kernel now use #170; actual video codec DMA and Android integration
+remain pending. The isolated stock driver metadata query is not decoding. See
 `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-m4u.rst` for qualification
 scope and retained script failure.
