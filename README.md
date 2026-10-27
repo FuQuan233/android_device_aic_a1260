@@ -528,3 +528,15 @@ exposed. Standard boot/kernel are #165; temporary tests are removed and
 ordinary ADB shell/four cores/default deep retained. See
 `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-hacc.rst` for evidence,
 the separately recorded freeze cancellation and remaining limits.
+
+Build #168 adds display M4U/SMI with real IOVA scanout through RDMA port1.
+COMMON/LARB0 own their BSP context and clock gates; MMSYS releases its LK
+bootstrap after consumers synchronize. Real400-page walks include physically
+scattered buffers; normal Android picture, allocation/CPU mmap/dma-buf handle
+checks, display cycles, two deep sleeps and CPU0 idle/GPU/I/O recovery passed
+on #166. Final #167 adds port bounds and repeats boot/buffer/scanout/power
+checks. Final #168 uses cached diagnostics during teardown; standard boot/kernel
+are #168 with ordinary shell/default CPU/deep
+policy retained. LARB1 and hardware video decoding are still pending. See
+`kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-m4u.rst` for qualification
+scope and retained script failure.
