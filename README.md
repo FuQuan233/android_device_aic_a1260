@@ -404,3 +404,13 @@ reopen before PLL setup; display off/on and automatic deep/cable wake were
 verified on hardware. The default ADB policy remains ordinary userdebug.
 See `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-mipi26m.rst` for
 factory Evidence, current LK comparison and unresolved physical rail wiring.
+
+## PWRAP link qualification
+
+Build #129 recovers late WACS2 read results before issuing another command
+and checks the fixed MT6350 DEW signature at probe and around suspend.
+Seven CPU frequency/voltage points and three deep/resume intervals passed;
+failed commands are never replayed. The read-only `link_state` attribute
+exposes test results and transport errors. Independent cold initialization
+and destructive link reset remain pending; LK still establishes the bus.
+See `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-pwrap-link.rst`.

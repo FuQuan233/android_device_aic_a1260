@@ -1,6 +1,6 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 boot-mipi26m.img（内核 #127，第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标已接入），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
+当前标准镜像为 boot-pwrap-link.img（内核 #129，新增PWRAP迟到结果回收与链路自检；保留第一阶段静态 fsck、自动 deep/MAINPLL 及 MT6350 硬件睡眠调压目标），默认 deep，ADB 普通启动为 shell。睡眠配置目标0.85V、入睡/恢复时实际1.15V，按键及插线唤醒均有新增cold验证；后续为CPU断电期间的电压/整机待机电流实测；电芯模型/共享电源实际接线仍保留待确认项，USB 大传输按用户要求暂缓。
 
 ## 当前剩余项核对（2026-10-27）
 
@@ -12,7 +12,7 @@
 SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完成）：
 
 1. **已补MIPI参考门控，保留物理供电未决项（#127）**。原机set_mipi26m及实机旧#126证实：TOP CG_CTRL0 bit4与AP_PLL_CON0 bit5在熄屏后仍开。已接dummy26m→TOP→AP→PHY PLL的真实CCF依赖，prepare/unprepare保持TOP先开/AP先关及PLL时序；CLK_IGNORE_UNUSED只保留LK交接前状态，正常最后消费者释放仍关。三轮显示开关实际门控Y/N/Y、计数1/0/1，RDMA欠流/异常0；物理自动deep停钟42.626483335秒，CPU0/L2 cold及MAINPLL off/on各1，SPM恢复error0，用户确认自行亮屏、画面触摸正常。首次freeze因bq24190-charger待唤醒取消，统计1成功/1freeze取消，设备挂起/恢复失败0；脚本screen_off采样延至唤醒后，不把其Y当作睡中观测。两个新gate读真实MMIO；老PLL通用硬件Y回退不作为PLL电源读回。MT6580不再读取其后端不使用的三字校准布局，其他平台不变。供电方面，旧所选触摸驱动与DT支持VGP1/2.8V，已接；其没有独立IOVCC消费，不等于必缺第二条可关轨。当前LK与用户Firmware_8.1/lk.bin仅7字节差异，相关LCM代码/表一致，三个power callbacks均0、检查过的上游wrapper无额外GPIO/LDO动作；panel实际轨及VIO18/VIO28全部消费者仍未确认，保留占位/常开。DSI engine/digital物理父级及D14未记载下游仍未知，保持保留策略；DDR PLL/运行时DVFS未接。记录见内核mt6580-mipi26m.rst、out/a1260-runtime-pm/{mipi26m/summary.json,panel-lk/findings-index.json}。产品boot.img/kernel已同步#127，默认ADB仍shell，无新增锁/闹钟；睡眠电压/待机电流尚需仪表测量。
-2. **PWRAP 独立初始化/故障恢复**。mt6580-pmic-wrap.c 仅接管固件初始化过的 WACS2，INIT_DONE 不存在就拒绝 probe；未实现冷初始化、重新校准采样/串行链路及完整异常恢复。当前 bootloader 路径已可读写并支持 PMIC 调压/关机，不等于脱离 LK 独立初始化。
+2. **PWRAP正常链路检查/迟到结果回收已补，独立冷初始化仍待做（#129）**。按旧MT6580 BSP的wait_for_state_idle/ready，在每轮原子等待中检查INIT_DONE，等待下一条命令前持续回收迟到VALID；业务超时保留错误，不重发可能已生效或有副作用的读写。probe、睡眠准备及恢复配置后要求DEW 0x018c=0x5aa5，新增只读link_state计数和末次失败现场。实际代码/MMIO锁存模型复现旧超时，9项新路径及ASAN/UBSAN通过；不冒充实机故障注入。#129正常shell启动、七档CPU请求/实际频率匹配、VPROC1.15–1.3V；两轮显式RTC deep停钟9.202197294/9.242877378秒，清理后另有自动deep24.754382505秒，总计成功3/失败0，CPU0/L2 cold及MAINPLL off/on均3，电压bank/PCM槽恢复error0，8MiB RAM校验一致。后续快照33036读/6727写、23次签名检查，错误/超时/INIT丢失/迟到回收计数全0；只证明正常链路回归，未观测到真实故障。ADC/电池/RTC、USB500mA、显示输出零欠流正常，ADB自行恢复并已unroot回shell；临时脚本/闹钟/锁已清理，产品boot.img/kernel同步#129。旧完整初始化涉及TOPRGU bit11+wrapper/SPI reset、24点采样、DIO/cipher/CRC等，多个错误出口缺回滚；不能当在线超时重试原样搬入。当前INIT_DONE缺失仍拒绝probe，脱离LK的冷初始化、重新校准及完整异常恢复保持未完成。详见内核mt6580-pwrap-link.rst及out/a1260-runtime-pm/pwrap-link。
 3. **pinctrl/EINT 剩余共享路由**。93 个引脚有 GPIO/IOCFG 描述，IRQ 仅 GPIO0..15 与专用 PMIC EINT17 路由可用；其余共享 EINT 映射未接入。应按未来 Wi-Fi/蓝牙/红外等真实消费者需求补齐，不替未使用引脚猜配置。
 4. **清醒时的省电路径**。cpuidle 只有 WFI 和同一硬件 WFI 的 s2idle 状态，尚无运行时多核协同 dormant/deep-idle；已验证的整机 suspend-to-RAM/deep 是另一条路径。CPU/总线/内存 DCM 没有完整接管策略，当前保留已知固件配置，I²C DCM 按 BSP 关闭；后续先做旧内核寄存器及依赖核对，再逐项资格化。
 5. **SoC 未接入功能块**。当前无 M4U/IOMMU、视频编解码、HACC 硬件加密接入；显示仍走物理地址、图形走已验证的 Mali。实机 hw_random 的 rng_available/rng_current 均为 none，crypto 为软件驱动；是否存在可用硬件 RNG、可复用何种 HACC 接口仍需先从旧源码确认，不能套用其他 SoC 的寄存器。eMMC 目前 8-bit/52 MHz，HS200/HS400 未验证，不以更高模式作为默认待办。
