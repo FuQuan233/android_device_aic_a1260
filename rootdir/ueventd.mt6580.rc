@@ -14,3 +14,7 @@
 
 # Only the separately privileged worker can use this CAP_SYS_RAWIO UAPI.
 /dev/mt6580-vcodec          0660 mediacodec mediacodec
+
+# WMT owns the shared CONSYS transport; Wi-Fi HAL only toggles its function.
+/dev/stpwmt                 0660 system system
+/dev/wmtWifi                0660 wifi wifi

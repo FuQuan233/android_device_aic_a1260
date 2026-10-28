@@ -98,7 +98,7 @@ USB charging/discharging status are verified. Capacity uses the reference BSP
 voltage curves and still needs cell/load calibration. The PMIC power key is
 also connected; the reference Power service remains until CPU power management
 is ready. Proprietary graphics userspace is handled by the integration below.
-Touch is verified; hardware audio and Wi-Fi remain unfinished.
+Touch and station Wi-Fi are verified; hardware audio remains unfinished. See [Wi-Fi bring-up](wifi/README.md).
 The latest codec checkpoint is #183: H.264 Baseline/Main/High decoding is
 qualified through MediaCodec, and MPEG4/H263 hardware encoding passes real
 SDK inputImage and GLES input-Surface checks. MPEG4 Level 6 is also verified
@@ -243,7 +243,7 @@ The four-core physical-timer build reaches the desktop without SystemUI ANRs
 in the captured boot events; long-term startup performance remains to be assessed.
 Bluetooth separately aborts because
 real-time scheduling is unavailable. Neither issue is treated as a GPU fix.
-SELinux remains permissive; physical audio/Wi-Fi are still pending.
+SELinux remains permissive; physical audio is still pending. Station Wi-Fi is described in [wifi/README.md](wifi/README.md).
 
 Mesa prebuilts are rebuilt from this workspace's `external/mesa3d` with:
 

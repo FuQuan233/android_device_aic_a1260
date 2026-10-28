@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: GPL-2.0-only
+package {
+    default_applicable_licenses: ["a1260_mt6580_wmt_license"],
+}
+license {
+    name: "a1260_mt6580_wmt_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-GPL-2.0-only"],
+    license_text: ["LICENSE"],
+}
+
+cc_binary {
+    name: "mt6580-wmt-dispatcher",
+    vendor: true,
+    compile_multilib: "32",
+    srcs: ["launcher.c"],
+    shared_libs: ["liblog"],
+    c_std: "c11",
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}

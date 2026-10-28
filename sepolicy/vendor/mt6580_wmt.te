@@ -1,0 +1,30 @@
+# WMT's userspace command/patch dispatcher does not own arbitrary MMIO and
+# needs no Linux capabilities. Only the original transport device is exposed.
+type mt6580_wmt, domain;
+type mt6580_wmt_exec, exec_type, vendor_file_type, file_type;
+type mt6580_wmt_device, dev_type;
+type mt6580_wifi_control_device, dev_type;
+init_daemon_domain(mt6580_wmt)
+
+allow mt6580_wmt mt6580_wmt_device:chr_file rw_file_perms;
+# Recovered legacy command family, narrowed to patch/HIF/chip configuration.
+# Actual owner-tool/ported-driver ABI is checked before enabling the service.
+allowxperm mt6580_wmt mt6580_wmt_device:chr_file ioctl {
+    0xa005 0xa00c 0xa00d 0xa00e 0xa00f 0xa016
+};
+allow mt6580_wmt vendor_file:dir r_dir_perms;
+allow mt6580_wmt vendor_file:file r_file_perms;
+
+# DriverTool's state-control write is the only shared CONSYS control the
+# standard Wi-Fi HAL needs. Loader/transport ioctls are not granted to it.
+allow hal_wifi_default mt6580_wifi_control_device:chr_file { getattr open write };
+
+# Limit direct kernel firmware reads to this port's signed regulatory database,
+# owner ROM/WLAN images and same-device RF calibration.
+type mt6580_wifi_firmware_file, file_type, vendor_file_type;
+allow kernel mt6580_wifi_firmware_file:file r_file_perms;
+allow kernel mt6580_wifi_firmware_file:system firmware_load;
+allow mt6580_wmt mt6580_wifi_firmware_file:file r_file_perms;
+# HAL retries signed regulatory.db after /vendor is mounted.
+allow hal_wifi_default mt6580_wifi_firmware_file:file r_file_perms;
+allow hal_wifi_default mt6580_wifi_firmware_file:system firmware_load;

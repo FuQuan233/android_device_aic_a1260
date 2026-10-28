@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_library_shared {
+    name: "libwifi-hal-mt6580",
+    vendor: true,
+    compile_multilib: "32",
+    srcs: ["wifi_hal.cpp"],
+    header_libs: ["wifi_legacy_headers"],
+    shared_libs: ["liblog"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}

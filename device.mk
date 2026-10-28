@@ -69,6 +69,8 @@ PRODUCT_SYSTEM_PROPERTIES += \
     debug.renderengine.backend=skiaglthreaded
 PRODUCT_SYSTEM_EXT_PROPERTIES += service.sf.prime_shader_cache=0
 
+$(call inherit-product, $(LOCAL_PATH)/wifi/wifi.mk)
+
 # Reference AIDL audio services keep AudioFlinger available during bring-up.
 # Physical MT6580 audio is not implemented; the boot flags select stub I/O.
 $(call inherit-product, hardware/interfaces/audio/aidl/default/audio_effects.mk)

@@ -60,3 +60,17 @@ DEVICE_MANIFEST_FILE := $(DEVICE_PATH)/manifest.xml
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/rootdir/fstab.mt6580
 TARGET_SCREEN_WIDTH := 480
 TARGET_SCREEN_HEIGHT := 800
+
+# CONSYS Gen2 uses a built-in AHB driver and one station interface. A small
+# real nl80211 HAL is loaded by the stock AIDL service via vendor_hals XML.
+# Do not select the absent MediaTek vendor implementation or a legacy .ko.
+BOARD_WLAN_DEVICE := wlan0
+BOARD_WPA_SUPPLICANT_DRIVER := NL80211
+WPA_SUPPLICANT_VERSION := VER_0_8_X
+WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := true
+WIFI_HAL_INTERFACE_COMBINATIONS := {{{STA}, 1}}
+# Standard DriverTool drives the real WMT character interface, not module
+# insertion. The old WMT control accepts the first ASCII byte of this write.
+WIFI_DRIVER_STATE_CTRL_PARAM := "/dev/wmtWifi"
+WIFI_DRIVER_STATE_ON := "1"
+WIFI_DRIVER_STATE_OFF := "0"

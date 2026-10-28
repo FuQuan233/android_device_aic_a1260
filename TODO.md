@@ -23,7 +23,7 @@ SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完�
 
 5. **SoC 功能块**。HACC 已按旧 BSP 接入软件密钥 AES ECB/CBC（128/192/256 位），完整自检与并发比对通过；PIO 实测慢于软件 AES，保留软件默认优先级，硬件可按驱动名选择，不接硬件派生密钥/OTP/安全启动接口。显示 M4U/SMI 已在 #168 接入并通过真实 IOVA 扫描输出及休眠恢复，LARB1 总线及 ISP 门控/休眠恢复已在 #170 接入，视频编解码随后已推进到 #183：H264 基础/Main/High 硬解和 Android MPEG4/H263 硬编已验证，剩余资格化边界见文末；图形继续使用已验证的 Mali 及其自身 MMU。TRNG 仅有 BSP 地址、IRQ 和门控位，寄存器协议及熵质量未确认，hw_random 仍无提供者，不套用其他 SoC 寄存器。eMMC 保持已验证的 8-bit/52 MHz。详见内核 mt6580-hacc.rst。
 6. **稳定性及边界验证**。高温临界关机未实测；GPU/内存长期压力、双指触摸仍未完成；USB 主机 bus-suspend/remote-wakeup 尚未完整资格化。大传输按用户要求暂缓，USB/IP 问题不能直接归因于控制器。
-7. **外围功能接入**。Wi-Fi、蓝牙/HCI HAL、物理音频仍未实现（当前音频为模拟输入/忽略输出）；原厂红外功能/特殊键应用动作、AW9106 LED 未接入。当前无 wlan 网络接口、声卡及视频节点，devices_deferred 为空；这只证明已声明设备没有挂起 probe，不代表缺失功能已完成。设备无基带和摄像头，产品继续 no-telephony/no-camera。
+7. **外围功能接入**。蓝牙/HCI HAL、物理音频仍未实现（Wi-Fi STA 已在 #191 接入，见文末）（当前音频为模拟输入/忽略输出）；原厂红外功能/特殊键应用动作、AW9106 LED 未接入。当前声卡仍未接入；视频节点与 wlan0 已由后续适配提供，devices_deferred 为空；这只证明已声明设备没有挂起 probe，不代表缺失功能已完成。设备无基带和摄像头，产品继续 no-telephony/no-camera。
 
 本次核对证据：out/a1260-runtime-pm/soc-audit-before-normal-adb.txt，及当前 DTS、cpuidle-mt6580.c、mt6580-pmic-wrap.c、pinctrl-mt6580.c、clk-mt6580-*.c。CPU 四核、604.5–1300 MHz 调频、GPU/DISP 电源域、eMMC、PMIC 关机和自动 deep 已有实机记录；不因上述清单重新宣称整颗 SoC 已全部完成。
 
@@ -229,3 +229,27 @@ Main/High×128×96/1280×720四组各24帧，共96帧逐像素一致，显示PTS
 最终YV12 store版本再次通过两种编码Surface各8帧、H264→Mali Surface8帧，FFmpeg独立复核编码颜色/PTS；scrcpy默认音视频录制12秒，得到18个480×800 H264帧和546个Opus包。最终native计数160 jobs/160 IRQ，timeout/cancellation/fault/power error均0，live缓冲/映射/字节全0，taint0。产品boot/kernel已统一#183，vendor.img按资格化二进制重建，四个实际安装的媒体二进制SHA256与产品stage一致。长期压力/吞吐、码控精度、零拷贝及跨deep保留编码任务仍待资格化。原厂MT6580 AVC编码器实际选择软件后端，未声明硬件AVC；MPEG4/H263硬编不会被普通scrcpy直接当作AVC使用。
 
 本轮收尾：清理私有探针、测试输入输出、vendor安装临时目录及27189转发，保留原vendor备份。普通shell ADB、四核/schedutil/604500..1300000/default deep/stay-on0恢复；临时唤醒锁和RTC闹钟均空。原厂codec库和同机efuse仅私有本地打包，不进入device仓库。
+
+## Wi-Fi STA（#191，2026-10-28）
+
+已从 GPL MT6580 Gen2/WMT/STP 源接入 AHB + BTIF，使用原厂固件与本机未改写的 RF 校准。
+实机证明 region7 拦住 CONN 访问：MPUS10470006 / MPUT3f880400，ROM ACK 后 DDR 补丁仍为空。
+分别补齐 WMT region6=后512KiB/0xa28 和 WLAN region5=前512KiB/0xa2d 后，固件 Ready 与扫描通过；
+PIO 禁 PDMA 不能同时丢掉 HifPdmaInit 中原本附带的独立 MPU 配置。
+原厂 EFUSE/VCN28 窗口、真实3.5V射频电压及 BTIF WAKE 低64–96us→高脉冲一并接入。
+Android AIDL/nl80211/wificond/supplicant 已提供设置界面，用户完成 WPA2 连接，DHCP/DNS/外网与 HTTPS200通过。
+稳定 ping 网关/外网各5次零丢包、收发错误0，冷启动 MPU 违例0；空闲后关闭确认 CONN/LDO断电，再开启成功。
+Google探测失败会被系统标成无互联网并阻止自动重连，单列为网络验证策略，未伪造已验证能力。
+后续：BTIF真实CCF停钟/有连接深睡、持续吞吐、缺省本地MAC持久化及高级能力。详见 wifi/README.md。
+
+**联网探测/校时补充（用户指定）**：MIUI `connect.rom.miui.com/generate_204` 的HTTP与HTTPS均实机204，
+NetworkMonitor成功，替代当前网络不可达的Google HTTPS探测。用户确认将无法解析的ntp.apple.com改为time.apple.com，
+真实SNTP查询成功，配置非test override，时间结果已缓存。默认值写入device资源覆盖和vendor一次性初始化，保留用户后续自定义。
+
+**最终收尾**：MIUI验证通过后再次关开，已保存热点自动连接、DHCP及3次网关ping零丢包，
+NetworkCapabilities真实带VALIDATED；累计CONN上电/断电4/3、当前连接开启，MPU违例0。
+Apple SNTP成功，lastSuccessfulUri=ntp://time.apple.com，真实时间结果已缓存；并非仅保存字符串。
+
+**最终标准镜像 #192**：清理未实现PMF的AES-CMAC广播后冷启动再次自动关联/DHCP，框架显示802.11n/65Mbps，
+MIUI验证成功；Apple SNTP由正常network-available流程自动成功，非仅手动刷新。默认shell ADB、四核schedutil、
+604500..1300000、deep/stay-on0保留，标准boot/kernel/vendor已同步。

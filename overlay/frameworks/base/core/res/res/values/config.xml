@@ -3,4 +3,7 @@
 <resources>
     <!-- Use the normal framework charging wake path on this display remote. -->
     <bool name="config_unplugTurnsOnScreen">true</bool>
+    <string-array name="config_ntpServers" translatable="false">
+        <item>ntp://time.apple.com</item>
+    </string-array>
 </resources>

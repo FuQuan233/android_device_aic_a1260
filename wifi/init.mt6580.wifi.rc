@@ -1,0 +1,24 @@
+on post-fs-data
+    mkdir /data/vendor/wifi 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
+    restorecon_recursive /data/vendor/wifi
+    setprop wlan.driver.status unloaded
+    write /sys/module/firmware_class/parameters/path /vendor/firmware
+
+# Source BTIF dispatcher answers kernel ROM-patch requests without a persistent
+# loopback power vote. The Wi-Fi HAL owns actual connectivity function power.
+service vendor.mt6580-wmt /vendor/bin/mt6580-wmt-dispatcher
+    class core
+    user system
+    group system
+
+on property:sys.boot_completed=1
+    start vendor.a1260-network-defaults
+
+service vendor.a1260-network-defaults /system/bin/sh /vendor/etc/a1260-network-defaults.sh
+    user shell
+    group shell
+    seclabel u:r:shell:s0
+    disabled
+    oneshot
