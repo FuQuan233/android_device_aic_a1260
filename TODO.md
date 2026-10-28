@@ -266,3 +266,14 @@ RX overflow/overrun、停钟超时、MPU违例0。初次过早探针无 DHCP 路
 但挂起 success=0/fail=3，其中两次设备阶段被 WLAN TX THREAD 取消，SPM未实际进入保留/深睡。
 cfg80211在未配置WoWLAN时主动断开，断开OID触发TX唤醒锁；旧AHB平台PM回调为空。
 下一步优先接真实cfg80211/WoWLAN、固件挂起/所有权及IRQ唤醒，再处理软件PNO，保持CONN的DDR保护不变。
+
+**#194 保持关联的保留待机通过（2026-10-28）**：仅提供标准WoWLAN ANY，supplicant overlay请求any；
+cfg80211不再主动断开，系统PM按真实AHB HIF IRQ开关wake。保留原固件sleepy/所有权读回，
+不调用带IPv6错误的旧过滤助手，不强制firmware-own或广告GTK/ARP/pattern offload。
+实际拔插7次挂起成功、回调7/7、内核明确记录7次IRQ99/AHB_SLAVE_HIF唤醒；
+1次拔线mt6350-usb取消，WLAN TX THREAD取消消失。入睡fw-own1/sleepy1/flags0/WHLPCR1；
+SPM state3/cpu0_mode0/fallback1/r0=4，CONN保护保留DDR/infra/MAINPLL。
+各阶段IPv4一致、无挂起carrier-off，插回后VALIDATED/网关5包零丢包/HTTPS200，netdev错误/MPU/taint0。
+此项取代上节#193的联网挂起阻塞；完整联网深睡、选择性唤醒、软件PNO/熄屏断网重连、持续吞吐、MAC持久化仍待完成。
+补关开回归：CONN/LDO释放、自动重连和新wiphy的ANY恢复、网关3包零丢包，错误/taint0。
+标准boot/kernel/vendor更新#194；记录/临时文件清理，普通shell ADB、四核schedutil/604500..1300000、deep/stay-on0保留。

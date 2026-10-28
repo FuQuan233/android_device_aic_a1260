@@ -74,3 +74,23 @@ MIUI探测及Apple自动校时再次成功；默认普通shell ADB、四核sched
 主动断开，断开 OID 又触发 TX 线程唤醒锁；旧 AHB platform suspend/resume 回调本身为空。
 下一步需完成 cfg80211/WoWLAN、固件挂起/所有权和唤醒 IRQ 的真实配合；本轮不记为“保持连接深睡通过”。
 恢复后 BTIF 仍停钟，溢出/超时/MPU违例和 taint 均为0。记录见 `out/a1260-runtime-pm/wifi-power/`。
+
+## 保持关联的保留待机
+
+内核的 cfg80211 PM 桥接仅提供标准 WoWLAN `any`：保持正常收发，以真实 AHB HIF IRQ 唤醒 AP。
+supplicant overlay 设置 `wowlan_triggers=any`，避免 #193 在挂起时被 cfg80211 主动断开。
+挂起开启 IRQ wake，恢复（包括其他设备取消挂起的回滚）及释放 IRQ 时配平引用。
+固件 sleepy 事件和原有所有权握手继续生效，不强制伪造 firmware-own；只读 netdev `pm_state` 记录相关状态。
+不接未验证的过滤/GTK/ARP offload，也不调用有 IPv6 类型问题的旧系统挂起助手。
+现有 CONN/DDR 保护保留，因此该模式不等同于联网时关闭 DDR/infra/MAINPLL。
+
+#194 实机拔线/熄屏/插回通过：7次实际系统挂起，cfg80211挂起/恢复7/7，IRQ99 `AHB_SLAVE_HIF`
+被内核明确记录为7次唤醒来源；不是只统计回调。入睡前firmware-own=1、sleepy=1、flags=0、
+WHLPCR=0x1，未强制改所有权。SPM为state3/cpu0_mode0/fallback1/r0 blocker0x4，确认CONN保护按预期保留DDR。
+拔线瞬间1次mt6350-usb待处理唤醒取消，WLAN TX THREAD取消不再出现。
+各阶段IPv4一致，未因挂起产生carrier-off；恢复后VALIDATED、网关5包零丢包、HTTPS200，收发错误0。
+IRQ wake已配平解除，BTIF仍停钟、MPU违例和taint为0。ANY会因正常无线活动唤醒，
+选择性过滤、更深的联网断电及长时待机功耗尚待后续资格化。
+随后关开Wi-Fi，CONN/LDO释放、保存网络重连及新wiphy的ANY配置恢复，网关3包零丢包、错误0。
+诊断须按netdev的phy80211链接查当前wiphy，不能在开关后继续硬编码phy0。
+标准boot/kernel/vendor已同步#194，测试脚本清理并恢复普通shell ADB。
