@@ -18,12 +18,22 @@ p.add_argument("destination", type=Path, help="local vendor/aic/a1260-codec")
 p.add_argument("--kernel", required=True, type=Path)
 p.add_argument("--cc", required=True, help="Android ARM32 clang driver")
 a = p.parse_args()
+def write_bytes_if_changed(path, data):
+    if not path.is_file() or path.read_bytes() != data:
+        path.write_bytes(data)
+
+
+def write_text_if_changed(path, text):
+    write_bytes_if_changed(path, text.encode('utf-8'))
+
+
 out = a.destination
 blobs = out / 'proprietary'
 blobs.mkdir(parents=True, exist_ok=True)
 # The VAL layout and internal decoder-state offsets were recovered against
 # exactly this owner-supplied BSP. Do not silently accept another binary ABI.
-EXPECTED = {'libstdc++.so': '76f954d3e42365127d6466ed9e1e9c0d0db4ae0eef330aa0a19606115f903d61',
+EXPECTED = {'libmp4enc_xa.ca7.so': '99b25c708b55cf982d3432efbaaed6b524b716df508255f995f53708d68d4404',
+'libstdc++.so': '76f954d3e42365127d6466ed9e1e9c0d0db4ae0eef330aa0a19606115f903d61',
 'libbacktrace.so': 'fd3425e0a7633c563c38d9271d80ad9857f49e37fe27bceff7631ad1636fcce6',
  'libbase.so': '2146b92d9949fd1a0af9531973a2029a48911ec788c6e9f4fed7d0e45b8709fe',
  'libbwc.so': '59a877d9c0151a199fd13e5bf3677c344b3598ac178105b95b071b5f988a17f4',
@@ -49,7 +59,7 @@ EXPECTED = {'libstdc++.so': '76f954d3e42365127d6466ed9e1e9c0d0db4ae0eef330aa0a19
 manifest = []
 vendor = '''libvcodecdrv.so libvcodec_utility.so libvcodec_oal.so libmtk_drvb.so
 libbwc.so libm4u.so libion_mtk.so libion_ulit.so libmmprofile.so
-libh264dec_xa.ca7.so libh264dec_xb.ca7.so libh264dec_sd.ca7.so libh264dec_customize.so'''.split()
+libh264dec_xa.ca7.so libh264dec_xb.ca7.so libh264dec_sd.ca7.so libh264dec_customize.so libmp4enc_xa.ca7.so'''.split()
 runtime = '''libutils.so libc++.so libbacktrace.so libbase.so libunwind.so
 liblzma.so libcutils.so libion.so liblog.so libstdc++.so'''.split()
 for directory, names in [(a.system / 'vendor/lib', vendor), (a.system / 'lib', runtime)]:
@@ -64,7 +74,7 @@ for directory, names in [(a.system / 'vendor/lib', vendor), (a.system / 'lib', r
             if data.count(old) != 1:
                 p.error('unsupported DRVB: expected one original dev_info pathname')
             data = data.replace(old, new.ljust(len(old), b'\0'))
-        (blobs / name).write_bytes(data)
+        write_bytes_if_changed(blobs / name, data)
         manifest.append({'file': name, 'source': str(src),
             'source_sha256': hashlib.sha256(src.read_bytes()).hexdigest(),
             'installed_sha256': hashlib.sha256(data).hexdigest()})
@@ -92,10 +102,10 @@ for entry in manifest:
         '    vendor: true,', '    compile_multilib: "32",',
         '    relative_install_path: "mt6580-codec",', '    strip: { none: true },',
         '    check_elf_files: false,', '}', '']
-(out / 'Android.bp').write_text('\n'.join(bp))
-(out / 'vcodec-vendor.mk').write_text(
+write_text_if_changed(out / 'Android.bp', '\n'.join(bp))
+write_text_if_changed(out / 'vcodec-vendor.mk',
     '# Generated local isolated stock codec package list.\n'
     'PRODUCT_SOONG_NAMESPACES += vendor/aic/a1260-codec\n'
     'PRODUCT_PACKAGES += \\\n    ' + ' \\\n    '.join(modules) + '\n')
-(out / 'vcodec-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+write_text_if_changed(out / 'vcodec-manifest.json', json.dumps(manifest, indent=2) + '\n')
 print(f'Packaged {len(modules)} private codec DSOs in {out}')

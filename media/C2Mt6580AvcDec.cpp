@@ -38,7 +38,8 @@ public:
             .withDefault(new C2StreamProfileLevelInfo::input(0u,
                 C2Config::PROFILE_AVC_BASELINE, C2Config::LEVEL_AVC_4))
             .withFields({C2F(mProfile, profile).oneOf({C2Config::PROFILE_AVC_BASELINE,
-                             C2Config::PROFILE_AVC_CONSTRAINED_BASELINE}),
+                             C2Config::PROFILE_AVC_CONSTRAINED_BASELINE,
+                             C2Config::PROFILE_AVC_MAIN, C2Config::PROFILE_AVC_HIGH}),
                          C2F(mProfile, level).oneOf({C2Config::LEVEL_AVC_1,
                              C2Config::LEVEL_AVC_1B, C2Config::LEVEL_AVC_1_1,
                              C2Config::LEVEL_AVC_1_2, C2Config::LEVEL_AVC_1_3,
@@ -167,19 +168,23 @@ void C2Mt6580AvcDec::empty(const std::unique_ptr<C2Work>& work, bool eos) {
 void C2Mt6580AvcDec::emit(Output output, const std::unique_ptr<C2Work>& current, bool incomplete, bool eos) {
     std::lock_guard<std::mutex> lock(mOutputMutex);
     if (mTransactionEpoch != mAbortEpoch.load()) return;
-    auto fill = [output, incomplete, eos](const std::unique_ptr<C2Work>& work) {
+    const bool isCurrent = current && output.token == current->input.ordinal.frameIndex.peeku();
+    // Notify in actual display order. Merely filling the current work delays
+    // its callback until process() returns, after finish() for a later DPB
+    // output in this same transaction (e.g. B2 then its reference P3).
+    auto fill = [output, incomplete, eos, isCurrent](const std::unique_ptr<C2Work>& work) {
         work->result = C2_OK; work->workletsProcessed = 1;
         auto& out = work->worklets.front()->output;
-        out.flags = static_cast<C2FrameData::flags_t>((incomplete ? C2FrameData::FLAG_INCOMPLETE : 0) |
+        out.flags = static_cast<C2FrameData::flags_t>(((incomplete || isCurrent) ? C2FrameData::FLAG_INCOMPLETE : 0) |
                 (eos ? C2FrameData::FLAG_END_OF_STREAM : 0));
         out.ordinal = output.ordinal;
         out.buffers = {output.buffer};
         if (output.config) out.configUpdate.push_back(
             std::make_unique<C2StreamPictureSizeInfo::output>(0u, output.width, output.height));
     };
-    if (current && output.token == current->input.ordinal.frameIndex.peeku()) {
-        if (incomplete) cloneAndSend(output.token, current, fill);
-        else fill(current);
+    if (isCurrent) {
+        cloneAndSend(output.token, current, fill);
+        if (!incomplete) empty(current, false);
     } else finish(output.token, fill);
     mPending.erase(output.token);
 }

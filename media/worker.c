@@ -112,35 +112,79 @@ static uint32_t ue(struct bits *b)
     while (!b->error && !bits(b, 1)) if (++zeros > 30) { b->error = 1; return 0; }
     return b->error ? 0 : ((UINT32_C(1) << zeros) - 1) + bits(b, zeros);
 }
-/* Bound dimensions before letting an old binary allocate from untrusted SPS.
- * This initial component advertises progressive Baseline only. */
+static int32_t se(struct bits *b)
+{
+    uint32_t value = ue(b);
+    return (value & 1) ? (int32_t)((value + 1) / 2) : -(int32_t)(value / 2);
+}
+static int scaling_list(struct bits *b, unsigned size)
+{
+    /* H.264 7.3.2.1.1: each present list has at most 64 signed deltas. */
+    int last = 8, next = 8;
+    for (unsigned i = 0; i < size; ++i) {
+        if (next) {
+            int32_t delta = se(b);
+            if (b->error || delta < -128 || delta > 127) return EINVAL;
+            next = (last + delta + 256) % 256;
+        }
+        if (next) last = next;
+    }
+    return 0;
+}
+/* Bound dimensions and the High-profile extension before an old binary can
+ * allocate from untrusted SPS. Only progressive, 8-bit 4:2:0 is admitted.
+ * Accepting a syntax here does not advertise that profile in the C2 interface. */
 static int validate_sps(const struct nal *n, uint32_t *width, uint32_t *height)
 {
     uint8_t rbsp[MT6580_C2_MAX_CSD_BYTES];
     size_t len = 0;
     unsigned zeros = 0;
+    if (!n || !width || !height || n->type != 7 ||
+        n->prefix >= n->size || n->size > sizeof(rbsp)) return EINVAL;
     for (size_t i = n->prefix + 1; i < n->size; ++i) {
         uint8_t v = n->data[i];
-        if (zeros >= 2 && v == 3) { zeros = 0; continue; }
+        if (zeros >= 2 && v == 3) {
+            if (i + 1 == n->size || n->data[i + 1] > 3) return EINVAL;
+            zeros = 0; continue;
+        }
         if (len == sizeof(rbsp)) return EINVAL;
         rbsp[len++] = v; zeros = v ? 0 : zeros + 1;
     }
     struct bits b = {rbsp, len * 8, 0, 0};
-    if (bits(&b, 8) != 66) return ENOTSUP;
+    uint32_t profile = bits(&b, 8);
+    if (b.error) return EINVAL;
+    if (profile != 66 && profile != 77 && profile != 100) return ENOTSUP;
     (void)bits(&b, 8); (void)bits(&b, 8);
-    if (ue(&b) > 31 || ue(&b) > 12) return EINVAL;
+    if (ue(&b) > 31 || b.error) return EINVAL;
+    if (profile == 100) {
+        /* Reject monochrome, 4:2:2/4:4:4, high bit depths and transform
+         * bypass: the native output copy is specifically 8-bit planar 420. */
+        uint32_t chroma = ue(&b), luma_depth = ue(&b), chroma_depth = ue(&b);
+        uint32_t bypass = bits(&b, 1);
+        if (b.error) return EINVAL;
+        if (chroma != 1 || luma_depth || chroma_depth || bypass) return ENOTSUP;
+        if (bits(&b, 1)) {
+            for (unsigned i = 0; i < 8; ++i) {
+                if (bits(&b, 1) && scaling_list(&b, i < 6 ? 16 : 64)) return EINVAL;
+            }
+        }
+        if (b.error) return EINVAL;
+    }
+    if (ue(&b) > 12 || b.error) return EINVAL;
     uint32_t poc = ue(&b);
     if (poc == 0) { if (ue(&b) > 12) return EINVAL; }
     else if (poc == 1) {
-        (void)bits(&b, 1); (void)ue(&b); (void)ue(&b);
+        (void)bits(&b, 1); (void)se(&b); (void)se(&b);
         uint32_t cycle = ue(&b);
         if (cycle > 255) return EINVAL;
-        for (uint32_t i = 0; i < cycle; ++i) (void)ue(&b);
+        for (uint32_t i = 0; i < cycle; ++i) (void)se(&b);
     } else if (poc != 2) return EINVAL;
     if (ue(&b) > 16) return EINVAL;
     (void)bits(&b, 1);
-    uint32_t mbw = ue(&b), mbh = ue(&b);
-    if (mbw >= 80 || mbh >= 45 || !bits(&b, 1)) return ENOTSUP;
+    uint32_t mbw = ue(&b), mbh = ue(&b), progressive = bits(&b, 1);
+    if (b.error) return EINVAL;
+    if (mbw >= MT6580_C2_MAX_WIDTH / 16 || mbh >= MT6580_C2_MAX_HEIGHT / 16 ||
+        !progressive) return ENOTSUP;
     (void)bits(&b, 1);
     uint32_t left = 0, right = 0, top = 0, bottom = 0;
     if (bits(&b, 1)) { left = ue(&b); right = ue(&b); top = ue(&b); bottom = ue(&b); }

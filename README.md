@@ -99,6 +99,10 @@ voltage curves and still needs cell/load calibration. The PMIC power key is
 also connected; the reference Power service remains until CPU power management
 is ready. Proprietary graphics userspace is handled by the integration below.
 Touch is verified; hardware audio and Wi-Fi remain unfinished.
+The latest codec checkpoint is #183: H.264 Baseline/Main/High decoding is
+qualified through MediaCodec, and MPEG4/H263 hardware encoding passes real
+SDK inputImage and GLES input-Surface checks. MPEG4 Level 6 is also verified
+at 1280x720/15fps. See the current codec section below. AVC encoding uses software.
 Camera and modem support are excluded because this unit has neither component.
 The opt-in external ramdisk FDT handover has been hardware-tested with a
 marker present only in the external archive. Android 17 static Bionic/toybox
@@ -539,35 +543,38 @@ checks. Final #168 uses cached diagnostics during teardown; standard boot/kernel
 are #168 with ordinary shell/default CPU/deep
 policy retained. Build #170 subsequently adds LARB1/ISP gating, eleven-port
 context and the real SMI source for ISP SRAM handshakes. Two deep and four
-runtime power cycles passed with GPU/eMMC/display regressions. Standard
-boot/kernel now use #170; actual video codec DMA and Android integration
-remain pending. The isolated stock driver metadata query is not decoding. See
+runtime power cycles passed with GPU/eMMC/display regressions. At the #170
+checkpoint, standard boot/kernel used #170 and actual video codec DMA and
+Android integration were still pending; the later codec checkpoints below
+supersede that snapshot. The isolated stock driver metadata query is not decoding. See
 `kernel/aic/mt6580/Documentation/arm/mediatek/mt6580-m4u.rst` for qualification
 scope and retained script failure.
 
-Build #178 prepares owned codec DMA-BUF/coherent buffers alongside display
+## Historical codec checkpoints (#178 and #182)
+
+At checkpoint #178, owned codec DMA-BUF/coherent buffers were prepared alongside display
 in the shared M4U group, with one ARM32 IOVA allocator and retained kernel DMA
 ownership. Native mapping/lifetime checks and 32 real stock H.264 instance
-Create/Release rounds pass in an isolated private process; live objects return
-to zero. No stock libraries are installed into the product. Actual decoder
-initialization, jobs/IRQ completion and Android hardware video decoding remain
-pending. See the kernel's mt6580-vcodec-buffers.rst for failure evidence and
-qualification scope. Standard boot/kernel now use #178.
+Create/Release rounds passed in an isolated private process; live objects
+returned to zero. At that checkpoint no stock libraries were installed into
+the product, and decoder initialization/jobs/IRQs/Android integration were
+still pending. See the kernel's mt6580-vcodec-buffers.rst for the historical
+failure evidence. Standard boot/kernel then used #178.
 
 
-The current development build #182 has now completed real native H.264
+Checkpoint #182 completed real native H.264
 hardware decoding, including the separate MP4-VENC auxiliary register window.
-The independent socket worker matches 128x96 and 1280x720 Baseline sample
+The independent socket worker matched 128x96 and 1280x720 Baseline sample
 pixels, tokens and PTS against libavc reference output, with real IRQs and no
-decode timeouts. Continuous 128-frame descriptor reuse and reset/EOS pass.
-The Android Codec2 AIDL V2 frontend and isolated worker now pass real
-MediaCodec decoding: 48 frames at 128x96 and another 48 at 1280x720 match
+decode timeouts. Continuous 128-frame descriptor reuse and reset/EOS passed.
+The Android Codec2 AIDL V2 frontend and isolated worker passed real
+MediaCodec decoding: 48 frames at 128x96 and another 48 at 1280x720 matched
 independent I420 reference pixels, with automatic hardware selection, original
 PTS, flush, both EOS forms, stop/reconfigure/start and repeated release.
-Surface -> external GLES texture -> Mali-400 MP readback also passes eight
-changing frames. The native counters account for all 104 jobs/IRQs, with zero
+Surface -> external GLES texture -> Mali-400 MP readback also passed eight
+changing frames. The native counters accounted for all 104 jobs/IRQs, with zero
 timeouts/cancellations/faults/power errors and no live buffers after release.
-The standard product boot/kernel are #182.
+The standard product boot/kernel at that checkpoint were #182.
 See `media/` and `tools/prepare_stock_vcodec.py` for the source integration.
 The legacy library dependencies are installed only in the worker's private
 `/vendor/lib/mt6580-codec` directory; ordinary C2 services never load them.
@@ -581,7 +588,7 @@ scanout. DMA heaps inherit the AOSP 0444 permissions so app-side MediaCodec
 and software codecs can allocate input buffers. The adapter opens heap nodes
 read-only and requests writable allocated DMA-BUFs through the normal ioctl.
 
-To generate the private decoder package locally (no DSOs or efuses in Git):
+To generate the private codec package locally (no DSOs or efuses in Git):
 
 ```sh
 python3 device/aic/a1260/tools/prepare_stock_vcodec.py /path/to/stock/system \
@@ -594,9 +601,132 @@ only under `/vendor/lib/mt6580-codec`; the modern C2 frontend stays isolated
 from the old C++ runtime. The worker runs as mediacodec with CAP_SYS_RAWIO,
 not root; adbd retains ordinary userdebug shell behavior. The private DRVB
 pathname adapts to this device's real devinfo file, preserving its validation.
-Current hardware scope is one progressive H.264 Baseline/ConstrainedBaseline
-stream up to 1280x720. Main/High, interlaced, adaptive/secure/tunneled playback,
-other codecs, throughput guarantees and a zero-copy output path are not
-qualified. Frame transfer currently uses explicit CPU copies. Evidence is in
+The #182 evidence is retained in
 `out/a1260-runtime-pm/vcodec-next/mediacodec-yuv-final.txt`,
-`mediacodec-720-final.txt` and `surface-yuv-final.txt`.
+`mediacodec-720-final.txt` and `surface-yuv-final.txt`. The current qualification
+scope is described below rather than inferred from that older checkpoint.
+
+## Hardware video codecs (#183, current qualification)
+
+H.264 Baseline/ConstrainedBaseline, Main and High are enabled for a single
+progressive 8-bit 4:2:0 decode stream up to 1280x720. Real x264 Main/High
+samples include CABAC, reordered B frames and, for High, actual 8x8 transforms.
+The private adapter selects the original `simp_b_frame=0` quality control;
+its earlier simplified-B path differed in 86 bytes in one frame and was not
+accepted as rounding tolerance. DRVB/devinfo validation remains enabled.
+The C2 frontend now notifies a current picture immediately through an
+INCOMPLETE clone, then completes its terminal work; this preserves display
+callback order when another pending work is completed within the same decode
+transaction. Reference matching uses original AU PTS, not coded-input FIFO.
+
+Main and High each pass 24 MediaCodec frames at both 128x96 and 1280x720:
+all 96 pictures match independent I420 references exactly, with correct display
+PTS, data/empty EOS, flush and stop/reconfigure/start. Baseline's 48-frame
+lifecycle and eight-frame SurfaceTexture -> Mali-400 MP GLES readback also
+pass on #183. Evidence is `out/a1260-runtime-pm/vcodec-profiles/`, especially
+`main-small-order-quality.txt`, the other `*-final.txt`, `baseline-183.txt`
+and `surface-183.txt`. Interlaced/>8-bit video, adaptive-resolution playback,
+secure/tunneled decoding, retained decode jobs across deep, sustained
+throughput and a zero-copy output path remain unqualified. Frames still move
+through explicit CPU copies.
+
+### Native MPEG4 encoder and shared VENC engine
+
+Build #183 adds the real VENC IRQ 138 alongside the decoder IRQ and serializes
+both engines through one native hardware owner. The selected VENC resource uses
+status +0x67c, ACK +0x678 (write 1), and enable +0x668, rather than another SoC's
+AVC register layout. GET_CAPS verifies the actual ARM DMA domain and the five
+required LARB1 ports (3/7/8/9/10) from the consumer's current IOMMU binding;
+there is no successful-looking physical-DMA or legacy `/dev/m4u` fallback.
+Both engines retain the real ISP OFF proof before freeing aborted DMA state,
+including quarantine when a safe stop cannot be established.
+
+The separate MPEG4 native worker passes runs of 8, 96 and 96 frames, 200 in
+all, including reset/drain and descriptor reuse. Original token/PTS matches
+and FINAL-state bookkeeping are checked. FFmpeg independently decodes all
+200 frames and matches their original frame identities, with per-frame PSNR
+about 47.8--51.9 dB. This is lossy encoding; it is not described as pixel-exact.
+Evidence includes `out/a1260-runtime-pm/venc-analysis/worker-check-fixed-ready.txt`,
+`worker-check.json`, `worker-fixed-quality.json` and `worker-v2-reuse.txt`.
+Those initial native runs are retained separately from the Android qualification
+below. The recovered FINAL adapter fills the original backend ABI from retained
+validated input/ring-buffer state before waiting and unlocking; it does not
+invent an extra frame. The wrapper descriptor stores timestamp high/low words
+in the opposite order to the raw backend, now handled explicitly in microseconds.
+Five further native configurations (40 frames) pass independent decoding,
+real VOS level checks and increasing MPEG4 VOP time. H263's stock temporal
+reference still implies roughly 29fps in a raw elementary stream: applications
+must retain the original MediaCodec PTS in a container. See `worker-v2-tsfix/`
+under the same evidence directory.
+
+### Android MPEG4/H263 hardware encoding
+
+`c2.mt6580.mpeg4.encoder` (`video/mp4v-es`) and `c2.mt6580.h263.encoder`
+(`video/3gpp`) run through an independent privileged encoder worker. Both
+encoder names share one live encoder instance; one decoder may coexist, with
+native hardware jobs serialized by the global owner. Applications and test
+clients retain ordinary shell/application permissions. Protocol version 2
+carries the explicit requested level in its 28-byte CONFIG. The constrained
+Open adapter programs the original backend's real SetParameter 0x29/0x2a
+controls instead of relabelling a VOS header. Explicit Simple Level 0 stays
+Level 0; its size/rate/bitrate combination is checked against the complete
+configuration before opening the native backend. C2 profile setters no longer
+reject a valid final configure batch against old default size/rate values.
+
+The vendor store advertises YV12 as an 8-bit 4:2:0 planar flexible format,
+including its nested reflection descriptor. This makes SDK inputImage buffers
+use the qualified minigbm YV12 path rather than flexible format 35's unsupported
+CPU-mapped NV12 allocation. The encoder accepts YV12 and implementation-defined
+Surface input; its existing CPU conversion/copy path remains explicit.
+
+Ordinary-shell `EncoderCodecCheck` passes four actual Android configurations:
+MPEG4 Level 0 at 128x96/64kbps, its conservative published 32kbps minimum,
+MPEG4 Level 6 at 1280x720/4Mbps, and H263 QCIF at 176x144/256kbps. All run
+at 15fps. Each produces 24 frames over data EOS, empty EOS, stop/configure/start
+and release/recreate, for 96 frames in 12 streams. Independent FFmpeg decoding
+confirms every frame's source identity, original PTS, dimensions and actual
+MPEG4 level, with lossy-image quality checked against the exact I420 inputs.
+The 720p run does not qualify 30fps throughput or accurate rate control.
+
+Ordinary-shell `SurfaceEncoderCheck` also encodes eight real Mali GLES colour
+frames through each encoder's input Surface, 16 frames total, with explicit
+presentation timestamps and signalEndOfInputStream. Independent FFmpeg RGB
+means differ from their known source colours by at most 6/255 for MPEG4 and
+3/255 for H263. These are actual encoded pictures, not just successful Surface
+creation. After the YV12 store change, High 720p decode again passes 24 exact
+frames including CABAC/B-frame reordering, flush, EOS and restart. Final-store
+regression also passes both eight-frame encoder Surfaces, the eight-frame
+H264 -> Mali Surface path, and a twelve-second scrcpy recording containing
+18 H264 frames and 546 Opus packets. Native counters finish at 160 jobs and
+160 IRQs, with zero timeout/cancellation/fault/power errors and no live buffers.
+Standard product boot/kernel are #183; vendor.img is rebuilt from the qualified
+binaries, whose installed hashes match the final product stage.
+
+Evidence is under `out/a1260-runtime-pm/venc-analysis/`:
+`android-encoders-final.txt`, `android-bytebuffer-quality.txt`,
+`android-output/bytebuffer-quality.json`, `android-output/surface-quality.json`
+and the two `android-*-surface.txt` logs. Sustained throughput, rate-control
+accuracy, zero-copy conversion and retained encoder jobs across deep remain
+unqualified. H263's raw temporal-reference limitation above still applies.
+The owner's MT6580 AVC encoder selects its original software backend and is
+not registered as hardware AVC; MPEG4/H263 support does not establish it.
+
+### scrcpy screen capture
+
+The product selects `debug.stagefright.c2inputsurface=-1` with the AIDL C2
+stores. This uses the framework's local AIDL GraphicBufferSource input Surface
+and avoids the absent HIDL OMX path that previously reached a null IOMX.
+An unmodified scrcpy 5.0.1 default audio/video run records 20 seconds with
+38 H.264 video frames and 986 Opus packets; evidence is
+`out/scrcpy/screen-default.log` and `screen-default.mkv`.
+
+That stream uses the software AVC encoder. It proves screen capture/encoding
+and transport through scrcpy, not hardware AVC encoding or a sustained frame
+rate. Opus packets do not qualify the separate physical audio hardware path.
+The normal scrcpy codec choices also do not directly select MPEG4/H263, so
+its successful default AVC run is kept separate from their hardware tests.
+
+Final cleanup removes the round's private probes, fixtures, extracted vendor
+payload and host forwarding port, retaining the original vendor backup.
+Normal shell ADB, four CPUs, schedutil 604500..1300000, default deep and
+stay-on=0 are retained; no temporary wake lock or RTC alarm remains.

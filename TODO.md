@@ -1,6 +1,6 @@
 # A1260 bring-up 待办
 
-当前标准镜像为 boot-vcodec-poll.img（内核 #182，已接 Android H264 硬解、真实任务/IRQ、解码缓冲桥及 ARM32 同组 DMA 映射；已有 LARB1/ISP、显示 M4U/SMI；继承 #165 HACC、#161 MCUSYS/BIU、#157 PWRAP 恢复及既有完整 deep）。保留软件 AES 默认优先级、普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0。电芯模型实际标定、供电接线/电流实测、编解码/TRNG及外围功能仍按下列清单处理；USB 大传输按用户要求暂缓。
+当前编解码实机资格化使用 #183，已补 VENC IRQ/五端口 M4U 能力检查；H264 Main/High 与 Baseline 回归已通过，Android MPEG4/H263 硬编及 MPEG4 Level6 720p 实际输出已通过。#182 的标准镜像同步记录保留为历史检查点，本轮完整 boot/kernel/vendor 收尾进度见文末。产品策略继续保留软件 AES 默认优先级、普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0；测试时按需 root 不等于恢复临时默认 root。电芯模型标定、供电/电流实测、编解码后续/TRNG及外围功能仍按下列清单处理；USB 大传输按用户要求暂缓。
 
 ## 当前剩余项核对（2026-10-27）
 
@@ -21,7 +21,7 @@ SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完�
 
 **#151内存时钟门控补充（2026-10-27）**：旧BSP及正常备份REA确认EMI按DBC15使能、EMI_CONH ratio3、TOP bits27/7使能执行，DBC和使能各有一次bit0低→高锁存。实机旧#150为TOP+0x0c=0、EMI+0x38=0；DRAMC AO+0x1dc=0xdb643842，bits31/30/25已由preloader开启，旧源码相关DRAMC写入本就#if0。新增CONFIG_COMMON_CLK_MT6580_EMI_DCM，TOP统一持有EMI资源并按掩码管理；DRAMC只读记录和恢复核对，不改其策略、DDR PLL或时序。运行值08001f8d/3、owned1/valid1/applies1；AXI/MAINPLL切换前暂停，早期恢复后才交还内核，部分失败保留所有权，未恢复不进入普通设备恢复。两轮deep停钟9.395571416/9.788576941秒，成功/失败0/0→2/0，EMI暂停/恢复2/2且前后同值，resume_fixes0；DRAMC核对2/失败0、8MiB RAM一致。四核64MiB/8轮/1GiB流量内存校验前后均0错误，第二轮与Mali并发，GPU1841帧/绿像素/GL错误0；4MiB对齐直接写与两次读回一致、eMMC 8-bit52MHz/error0，400000一致性计数及跨核时钟迁移通过。保留EMI开启后，普通governor完成1237次实际CPU0 dormant/失败0，RAM及恢复四核通过。内存源计算值266499673Hz保持；不将其或寄存器读回当作瞬时门钟/实际电流测量。清理期间又由Android自动deep停钟55.747988563秒，累计成功/失败3/0、EMI早期暂停/恢复3/3、DRAMC检查3/失败0，仍无晚期修复。标准boot.img/kernel同步#151，默认普通shell、四核/schedutil/604500..1300000/default deep保留，测试锁/RTC/跟踪/脚本清理。MCUSYS/L2 DCM、DDR调频和电流实测仍未完成。证据：`out/a1260-runtime-pm/memory-dcm/summary.json`、内核`mt6580-memory-dcm.rst`。
 
-5. **SoC 功能块**。HACC 已按旧 BSP 接入软件密钥 AES ECB/CBC（128/192/256 位），完整自检与并发比对通过；PIO 实测慢于软件 AES，保留软件默认优先级，硬件可按驱动名选择，不接硬件派生密钥/OTP/安全启动接口。显示 M4U/SMI 已在 #168 接入并通过真实 IOVA 扫描输出及休眠恢复，LARB1 总线及 ISP 门控/休眠恢复已在 #170 接入，视频编解码 DMA/组件仍未接入；图形继续使用已验证的 Mali 及其自身 MMU。TRNG 仅有 BSP 地址、IRQ 和门控位，寄存器协议及熵质量未确认，hw_random 仍无提供者，不套用其他 SoC 寄存器。eMMC 保持已验证的 8-bit/52 MHz。详见内核 mt6580-hacc.rst。
+5. **SoC 功能块**。HACC 已按旧 BSP 接入软件密钥 AES ECB/CBC（128/192/256 位），完整自检与并发比对通过；PIO 实测慢于软件 AES，保留软件默认优先级，硬件可按驱动名选择，不接硬件派生密钥/OTP/安全启动接口。显示 M4U/SMI 已在 #168 接入并通过真实 IOVA 扫描输出及休眠恢复，LARB1 总线及 ISP 门控/休眠恢复已在 #170 接入，视频编解码随后已推进到 #183：H264 基础/Main/High 硬解和 Android MPEG4/H263 硬编已验证，剩余资格化边界见文末；图形继续使用已验证的 Mali 及其自身 MMU。TRNG 仅有 BSP 地址、IRQ 和门控位，寄存器协议及熵质量未确认，hw_random 仍无提供者，不套用其他 SoC 寄存器。eMMC 保持已验证的 8-bit/52 MHz。详见内核 mt6580-hacc.rst。
 6. **稳定性及边界验证**。高温临界关机未实测；GPU/内存长期压力、双指触摸仍未完成；USB 主机 bus-suspend/remote-wakeup 尚未完整资格化。大传输按用户要求暂缓，USB/IP 问题不能直接归因于控制器。
 7. **外围功能接入**。Wi-Fi、蓝牙/HCI HAL、物理音频仍未实现（当前音频为模拟输入/忽略输出）；原厂红外功能/特殊键应用动作、AW9106 LED 未接入。当前无 wlan 网络接口、声卡及视频节点，devices_deferred 为空；这只证明已声明设备没有挂起 probe，不代表缺失功能已完成。设备无基带和摄像头，产品继续 no-telephony/no-camera。
 
@@ -184,7 +184,9 @@ SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完�
 #178回归补充：两轮完整deep停钟8.892298497/9.052424153秒，CPU0/L2 cold2，8MiB RAM一致；第二轮因alarmtimer临近系统闹钟-EBUSY取消一次后重试通过，success/fail2/1，不记成零取消。四轮LARB1 runtime开关、MMU608及VC/11个OSTD恢复通过，codec gate仍关；随后native及stock32轮再过、累计alloc4/import72/mmap6而live全0。Mali1820帧/绿像素/GL0，4MiB对齐eMMC写+两读一致、8-bit52MHz/error0；M4U fault/timeout0、RDMA欠流/异常0、taint0，MD1/ISP/DISP/MFG均off。未跨deep持有独立codec缓冲，不将其冒充decoder DMA或IRQ验证。标准产物同步#178，临时探针/旧库/锁/闹钟清理，默认普通shell/四核/schedutil/604500..1300000/default deep/stay-on0保留。完整dt-schema工具不可用，仅YAML语法及实际kernel/DTB构建通过。
 
 
-硬解进行中（开发内核 #182，标准产物仍 #178）：真实 H264 已出帧。
+### 历史检查点：#182 开发阶段（当时标准产物仍 #178）
+
+当时真实 H264 已出帧，以下“正在构建/尚未确认”为该阶段记录，由后续资格化结果覆盖。
 #181 native 8 帧 exact I420+8 IRQ；独立 worker 20轮 reset/EOS 的160帧及两轮连续128帧完全一致，累计432 jobs/IRQs、无超时、live0。
 #182 修复 WAIT(0) 误取消任务，空锁轮询返回 EAGAIN、显式取消/真实ISP OFF检查通过；该1次取消为刻意检查，不是解码超时。
 随后1280×720 Baseline实际切双线程XB库，8帧像素/token/PTS一致、8 IRQ/timeouts0/live0。
@@ -193,10 +195,37 @@ Codec2 AIDL V2 前端/独立worker及私有原厂库打包已写入源码，正�
 原始配置未设置真实Linux TID、缺libmmprofile、DRVB毒栈、mmap缺FOP_UNSIGNED_OFFSET和缺辅助寄存器资源的失败日志均保留在vcodec-next，不将其算作成功出帧。
 
 
-## Android 硬解接入完成（#182，2026-10-28）
+## 历史检查点：Android 基础硬解接入（#182，2026-10-28）
 
 Codec2 AIDL V2 注册 c2.mt6580.avc.decoder，普通 shell/应用可自动选择硬件组件；前端和原厂后端分进程，worker 是 mediacodec + CAP_SYS_RAWIO。原厂库仅在私有目录，保留真实 devinfo 校验；补齐 libstdc++ 私有依赖及 init socket 环境变量规范。minigbm 保留168字节/2FD原厂句柄，增加单 DMA-BUF 三逻辑平面的 YV12 和边界检查；不冒充 YUV 直接扫描。修复旧设备 ueventd 0660 覆盖导致普通应用与音频服务不能分配 system heap，恢复 AOSP 0444；VAL 打开 heap 改 O_RDONLY，DMA-BUF 仍由 ioctl 返回可写 FD。
 
 实际 Android MediaCodec：128×96 和1280×720 各48帧均逐像素匹配独立 libavc I420 参考，PTS、flush、携数据/空 EOS、stop/configure/start、两次实例释放通过；自动选择硬件且保留软件解码器。SurfaceTexture→Mali-400 MP external texture→GPU 回读8帧变化及时间戳通过。累计104个硬件任务/104次真实IRQ，超时/取消/故障/供电错误0，live VMA/缓冲/字节全0。此前失败记录保留，不以 Java 异常退出137冒充内核崩溃。产物统一 #182 boot/kernel 与新 vendor，system 不需更新。
 
-当前仅单实例、逐行 H264 Baseline/ConstrainedBaseline ≤720p；Main/High、交错、其他视频格式、完整应用 seek/动态分辨率及跨 deep 保留解码任务未验证。帧通过显式 CPU 拷贝转移，未宣称零拷贝或实际帧率。详情见 README、media/、内核 mt6580-vcodec-buffers.rst 及 out/a1260-runtime-pm/vcodec-next。
+该 #182 检查点当时仅验证单实例、逐行 H264 Baseline/ConstrainedBaseline ≤720p；当时 Main/High、交错、其他视频格式、完整应用 seek/动态分辨率及跨 deep 保留解码任务尚未验证。Main/High 后续结果见下节。帧通过显式 CPU 拷贝转移，未宣称零拷贝或实际帧率。详情见 README、media/、内核 mt6580-vcodec-buffers.rst 及 out/a1260-runtime-pm/vcodec-next。
+
+
+## 当前编解码资格化（#183，2026-10-28）
+
+H264 已启用 Baseline/ConstrainedBaseline、Main、High，范围为单实例、8位420、逐行≤1280×720。真实 x264 Main/High 样本含 CABAC、B帧及 High 的8×8变换；私有适配器选择原厂 `simp_b_frame=0`，去掉原简化B帧路径带来的86字节差异（最大误差23），不以“舍入容差”接受错误。C2 当前work改为立即INCOMPLETE clone通知，再完成terminal work，修正同事务完成其他pending work时的显示回调顺序。所有参考按原AU的PTS对应，不能按编码提交FIFO猜帧号。
+
+Main/High×128×96/1280×720四组各24帧，共96帧逐像素一致，显示PTS递增、data/empty EOS、flush及stop/configure/start通过。#183还通过Baseline48帧生命周期及8帧SurfaceTexture→Mali外部纹理/GLES回读。日志在 `out/a1260-runtime-pm/vcodec-profiles/`：`main-small-order-quality.txt`、其余`*-final.txt`、`baseline-183.txt`、`surface-183.txt`。交错/>8位、自适应分辨率、secure/tunneled、跨deep保留解码任务、持续吞吐和零拷贝仍未资格化；当前明确存在CPU帧拷贝。
+
+### scrcpy 默认音视频已恢复
+
+`device.mk`选择 `debug.stagefright.c2inputsurface=-1`，使用框架本地AIDL GraphicBufferSource，避开不存在的HIDL OMX路径及空IOMX。原版scrcpy5.0.1默认音视频已录制20秒，文件含38个H264视频帧及986个Opus包，证据 `out/scrcpy/screen-default.log`、`screen-default.mkv`。这是软件AVC编码路径的屏幕采集、编码和传输验证，不冒充硬件AVC或持续帧率测试，也不把Opus包存在算成实体音频外设适配完成。
+
+### Android MPEG4/H263 硬编与 Level6 720p 已验证
+
+#183接真实VENC IRQ138，按本SoC状态+0x67c/ACK+0x678写1/使能+0x668处理，与解码共用全局owner及真实ISP OFF/失败隔离契约。GET_CAPS检查真实ARM DMA映射/域和LARB1五端口3/7/8/9/10的当前IOMMU绑定，不假装旧/dev/m4u配置成功或回退物理DMA。
+
+独立MPEG4 native worker的8+96+96共200帧保留为早期证据：原始token/PTS、reset/drain、descriptor复用和FINAL状态检查通过；FFmpeg独立解出200帧并匹配原始帧身份，逐帧PSNR约47.8..51.9dB，有损编码不记为像素精确。恢复的FINAL适配器从保留且已验证的输入/ring-buffer状态填全原厂ABI，再执行真实等待/解锁，未伪造补帧。时间戳按原OMX的descriptor高字/低字布局写入，原始后端相反顺序及微秒单位明确转换。随后五种配置共40帧再次独立解码通过，真实VOS级别及MPEG4 VOP时间递增正常；H263原厂raw temporal reference仍约29fps，应用必须在容器保存原始MediaCodec PTS。证据在 `out/a1260-runtime-pm/venc-analysis/worker-v2-tsfix/`，早期证据 `worker-check-fixed-ready.txt`、`worker-check.json`、`worker-fixed-quality.json`、`worker-v2-reuse.txt` 保留。
+
+`c2.mt6580.mpeg4.encoder` 与 `c2.mt6580.h263.encoder` 共用一个编码实例，可与一个解码实例共存，native全局owner串行硬件任务；编码worker独立且有特权，调用方仍普通shell/应用。协议V2/28字节CONFIG传真实请求level，受约束Open适配器通过SetParameter0x29/0x2a控制，不改VOS标签冒充Level6。显式Level0不自动升级，组合边界在完整CONFIG前检查；C2 profile setter只校验支持范围，避免多批次configure对旧尺寸/帧率误报。vendor store已声明YV12/8bit420/PLANAR及嵌套反射结构，SDK inputImage使用已验证的minigbm YV12，避免35映射到不能CPU分配的NV12；Surface继续显式CPU转换，不声称零拷贝。
+
+普通shell实机 `EncoderCodecCheck` 四组通过：MPEG4 Level0 128×96/64kbps、保守公开最低32kbps、Level6 1280×720/4Mbps、H263 QCIF 176×144/256kbps，均15fps。各24帧覆盖携数据/空EOS、stop/configure/start、release/recreate，合计12流96帧。FFmpeg独立解码确认每帧原始图像身份、原PTS、尺寸和真实MPEG4 level，并与准确I420输入做有损质量检查；不把720p/15fps小样本当成30fps吞吐或码控精度测试。
+
+普通shell `SurfaceEncoderCheck` 两编码器各8帧，共16帧，实际Mali GLES颜色→input Surface→码流，给定presentation timestamp并signalEndOfInputStream。FFmpeg独立回读RGB均值，MPEG4最大误差6/255，H263为3/255，原PTS正常。YV12 store最终反射修复后，High720p又完成24帧像素精确回归，含CABAC/B帧、flush、EOS和restart。证据 `android-encoders-final.txt`、`android-bytebuffer-quality.txt`、`android-output/bytebuffer-quality.json`、`android-output/surface-quality.json` 及 `android-*-surface.txt`，均在venc-analysis目录。
+
+最终YV12 store版本再次通过两种编码Surface各8帧、H264→Mali Surface8帧，FFmpeg独立复核编码颜色/PTS；scrcpy默认音视频录制12秒，得到18个480×800 H264帧和546个Opus包。最终native计数160 jobs/160 IRQ，timeout/cancellation/fault/power error均0，live缓冲/映射/字节全0，taint0。产品boot/kernel已统一#183，vendor.img按资格化二进制重建，四个实际安装的媒体二进制SHA256与产品stage一致。长期压力/吞吐、码控精度、零拷贝及跨deep保留编码任务仍待资格化。原厂MT6580 AVC编码器实际选择软件后端，未声明硬件AVC；MPEG4/H263硬编不会被普通scrcpy直接当作AVC使用。
+
+本轮收尾：清理私有探针、测试输入输出、vendor安装临时目录及27189转发，保留原vendor备份。普通shell ADB、四核/schedutil/604500..1300000/default deep/stay-on0恢复；临时唤醒锁和RTC闹钟均空。原厂codec库和同机efuse仅私有本地打包，不进入device仓库。

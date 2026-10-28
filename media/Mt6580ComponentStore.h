@@ -25,9 +25,10 @@ public:
 private:
     std::shared_ptr<C2ComponentStore> mPlatform;
     std::shared_ptr<C2ReflectorHelper> mReflector;
-    std::shared_ptr<C2Component::Traits> mTraits;
+    std::shared_ptr<C2InterfaceHelper> mStoreParams;
+    std::vector<std::shared_ptr<const C2Component::Traits>> mTraits;
     std::mutex mMutex;
-    std::weak_ptr<C2Component> mActive;
+    std::weak_ptr<C2Component> mActiveDecoder, mActiveEncoder;
     std::atomic<c2_node_id_t> mNextId{1};
 };
 }

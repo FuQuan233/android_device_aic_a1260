@@ -1,4 +1,4 @@
-# Legacy binary decoder stays outside the Android media/C2 process.
+# Legacy binary codecs stay outside the Android media/C2 process.
 type mt6580_codec_worker, domain;
 type mt6580_codec_worker_exec, exec_type, vendor_file_type, file_type;
 type mt6580_vcodec_device, dev_type;
@@ -15,3 +15,4 @@ get_prop(mt6580_codec_worker, vendor_default_prop)
 # builds. A production port needs a validated register-command kernel interface.
 userdebug_or_eng(`allow mt6580_codec_worker self:capability sys_rawio;')
 unix_socket_connect(mediacodec, mt6580_vcodec, mt6580_codec_worker)
+# Both private codec sockets use mt6580_vcodec_socket and this worker domain.

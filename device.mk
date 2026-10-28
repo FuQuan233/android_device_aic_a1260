@@ -89,7 +89,12 @@ $(call inherit-product, vendor/aic/a1260-codec/vcodec-vendor.mk)
 PRODUCT_PACKAGES += \
     android.hardware.media.c2-service.mt6580 \
     mt6580-codec-worker \
+    mt6580-encoder-worker \
     a1260-codec2-seccomp-ext \
     media_codecs_mt6580
 # Select the AIDL C2 stores for both the vendor decoder and software fallback.
-PRODUCT_VENDOR_PROPERTIES += media.c2.hal.selection=aidl
+# No legacy OMX/HIDL service is provided. Use the framework's AIDL GBS
+# input surface for screen capture and software/hardware encoder consumers.
+PRODUCT_VENDOR_PROPERTIES += \
+    media.c2.hal.selection=aidl \
+    debug.stagefright.c2inputsurface=-1

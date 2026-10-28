@@ -12,4 +12,22 @@
             <Limit name="concurrent-instances" max="1" />
         </MediaCodec>
     </Decoders>
+    <Encoders>
+        <MediaCodec name="c2.mt6580.mpeg4.encoder" type="video/mp4v-es" rank="256">
+            <Limit name="size" min="16x16" max="1280x720" />
+            <Limit name="alignment" value="16x16" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="blocks-per-second" range="1-108000" />
+            <Limit name="bitrate" range="32000-12000000" />
+            <Limit name="concurrent-instances" max="1" />
+        </MediaCodec>
+        <MediaCodec name="c2.mt6580.h263.encoder" type="video/3gpp" rank="256">
+            <Limit name="size" min="176x144" max="352x288" />
+            <Limit name="alignment" value="16x16" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="blocks-per-second" range="1-11880" />
+            <Limit name="bitrate" range="32000-2000000" />
+            <Limit name="concurrent-instances" max="1" />
+        </MediaCodec>
+    </Encoders>
 </MediaCodecs>

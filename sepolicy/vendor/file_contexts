@@ -15,3 +15,6 @@
 /vendor/bin/mt6580-codec-worker    u:object_r:mt6580_codec_worker_exec:s0
 /dev/mt6580-vcodec    u:object_r:mt6580_vcodec_device:s0
 /dev/socket/mt6580-vcodec    u:object_r:mt6580_vcodec_socket:s0
+
+/vendor/bin/mt6580-encoder-worker u:object_r:mt6580_codec_worker_exec:s0
+/dev/socket/mt6580-venc u:object_r:mt6580_vcodec_socket:s0

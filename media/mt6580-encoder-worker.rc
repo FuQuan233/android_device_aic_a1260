@@ -1,0 +1,11 @@
+# Actual MPEG4/H263 hybrid engine; stock AVC uses software and is not advertised.
+service vendor.mt6580-encoder-worker /vendor/bin/mt6580-encoder-worker
+    class hal
+    user mediacodec
+    group mediacodec graphics
+    capabilities SYS_RAWIO
+    socket mt6580-venc stream 0660 mediacodec mediacodec
+    setenv MT6580_CODEC_LIBDIR /vendor/lib/mt6580-codec
+    setenv LD_LIBRARY_PATH /vendor/lib/mt6580-codec
+    setenv LD_PRELOAD /vendor/lib/mt6580-codec/libval-decode-bridge.so
+    task_profiles ProcessCapacityHigh
