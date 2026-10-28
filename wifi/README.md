@@ -13,8 +13,9 @@ python3 device/aic/a1260/tools/prepare_stock_wifi.py \
 ```
 
 WIFI 记录接受原始 514 字节或其中前 512 字节；RF 数据保持原样。
-空 MAC 字段不会被当作整份校准无效：内核优先使用有效的 NIC 地址，否则使用明确标记的本地随机地址。
-当前没有动态修改 MAC 的固件确认实现，因此不广告随机化能力；持久化缺省本地地址仍可后续完善。
+空 MAC 字段不会被当作整份校准无效：有效 NVRAM MAC 优先，否则使用早期初始化提供的原厂 MAC、
+有效 NIC 地址，最后才使用本次开机缓存的本地随机地址。原厂地址读取方式见下节。
+当前没有动态修改 MAC 的固件确认实现，因此不广告随机化能力。
 ROM 补丁和 WLAN 固件校验指定原厂文件 SHA256；控制程序 `mt6580-wmt-dispatcher`
 从 `wifi/wmt/launcher.c` 构建，不运行原厂会长期持有 loopback 电源引用的 launcher。
 
@@ -46,7 +47,7 @@ NetworkMonitor 已判定成功。NTP 使用经用户确认的 `time.apple.com`�
 启动时的一次性 `network-defaults.sh` 也为已有 bring-up 镜像设置尚未指定的默认值，保留后续用户修改。
 当前镜像通过正常网络探测，不伪造已验证状态或绕过 TLS。
 
-连接状态下更深的系统休眠、长时间吞吐及 MAC 持久化仍待独立资格化。
+连接状态下更深的系统休眠、长时间吞吐仍待独立资格化。
 当前 Wi-Fi 开启时 SPM 保留 CONN 所需资源；关闭后释放。SELinux 仍沿用设备整体 permissive 策略，
 新增规则已通过 neverallow 检查，不代表其他硬件策略已完成。
 
@@ -120,3 +121,23 @@ IRQ wake已配平解除，BTIF仍停钟、MPU违例和taint为0。ANY会因正�
 实际完成6次保留待机，另2次被临近的alarmtimer以-EBUSY取消；cfg80211挂起/恢复8/8、IRQ wake解除、错误0。
 插回后网络VALIDATED、网关5包零丢包、HTTPS200，收发错误/MPU/taint0；脚本COMPLETE/EXIT_STATUS0。
 这补齐了熄屏断网及跨待机的定时重扫，不等于已完成联网DDR/infra/MAINPLL关闭或长期功耗标定。
+
+## 原厂序列号与 MAC（#197）
+
+早期备份的 proinfo 与实机 SHA256 一致；通过只读提取同一备份的 nvdata，
+确认 `proinfo+0x6e` 的六字节对应 `APCFG/APRDEB/WIFI+4`，
+`+0x68` 对应 `BT_Addr+0`。序列号按原厂 LK 的 `+0x74`、最多19字节读取，
+遇 NUL 停止，仅接受 ASCII 字母数字，不把填充或二进制 MAC 拼进字符串。
+蓝牙地址只作布局确认，本轮未接蓝牙功能。
+
+`post-fs-data` 等待 proinfo 和 Wi-Fi 平台节点，再由现有 USB 初始化服务只读解析。
+原厂 Wi-Fi MAC 在第一次开无线前写入内核的一次性 `factory_mac_address`，
+序列号提供给 `ro.boot.serialno`、`ro.serialno`、`sys.usb.serialnumber` 和 USB iSerial。
+不再从 eMMC CID 派生身份，也不回写 proinfo/NVRAM/RF 数据；SELinux 只新增相应读取/配置权限，
+整机 permissive 的既有限制仍在，未宣称完整 enforcing 资格化。
+
+实测两次完整无线关开（CONN 关闭再开启）和随后正常重启，原厂 MAC、序列号保持不变，
+均自动关联/DHCP；四个联网快照各网关5包无丢包、HTTPS200、收发错误/taint为0。
+无效 MAC 写入返回 EINVAL，运行后换地址返回 EBUSY，重复同值允许。
+原厂分区与已安装 RF 校准 SHA256 未变。主机 ADB 原始字节与 USB iSerial 均为原厂16个可打印字符；
+此前用户遇到的不可见字符未在修复前独立复现，不推断它必然由 EP0 包边界引起。

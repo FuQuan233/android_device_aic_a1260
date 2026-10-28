@@ -28,3 +28,10 @@ allow mt6580_wmt mt6580_wifi_firmware_file:file r_file_perms;
 # HAL retries signed regulatory.db after /vendor is mounted.
 allow hal_wifi_default mt6580_wifi_firmware_file:file r_file_perms;
 allow hal_wifi_default mt6580_wifi_firmware_file:system firmware_load;
+
+# Only the early vendor init identity action may provision the factory MAC.
+type sysfs_mt6580_wifi_mac, fs_type, sysfs_type;
+allow vendor_init sysfs_mt6580_wifi_mac:file rw_file_perms;
+
+type mt6580_proinfo_block_device, dev_type;
+allow vendor_init mt6580_proinfo_block_device:blk_file r_file_perms;

@@ -19,6 +19,8 @@ on late-fs
 
 on post-fs-data
     start vendor.a1260-logcat
+    wait /dev/block/by-name/proinfo 5
+    wait /sys/devices/platform/180f0000.wifi/factory_mac_address 5
     exec_start vendor.a1260-usb-setup
 
 service vendor.a1260-watchdog /system/bin/watchdogd 5 25
