@@ -23,7 +23,7 @@ SoC/配套电路后续顺序（本次只核对，不把未测能力写成已完�
 
 5. **SoC 功能块**。HACC 已按旧 BSP 接入软件密钥 AES ECB/CBC（128/192/256 位），完整自检与并发比对通过；PIO 实测慢于软件 AES，保留软件默认优先级，硬件可按驱动名选择，不接硬件派生密钥/OTP/安全启动接口。显示 M4U/SMI 已在 #168 接入并通过真实 IOVA 扫描输出及休眠恢复，LARB1 总线及 ISP 门控/休眠恢复已在 #170 接入，视频编解码随后已推进到 #183：H264 基础/Main/High 硬解和 Android MPEG4/H263 硬编已验证，剩余资格化边界见文末；图形继续使用已验证的 Mali 及其自身 MMU。TRNG 仅有 BSP 地址、IRQ 和门控位，寄存器协议及熵质量未确认，hw_random 仍无提供者，不套用其他 SoC 寄存器。eMMC 保持已验证的 8-bit/52 MHz。详见内核 mt6580-hacc.rst。
 6. **稳定性及边界验证**。高温临界关机未实测；GPU/内存长期压力、双指触摸仍未完成；USB 主机 bus-suspend/remote-wakeup 尚未完整资格化。大传输按用户要求暂缓，USB/IP 问题不能直接归因于控制器。
-7. **外围功能接入**。蓝牙/HCI HAL、物理音频仍未实现（Wi-Fi STA 已在 #191 接入，见文末）（当前音频为模拟输入/忽略输出）；原厂红外功能/特殊键应用动作、AW9106 LED 未接入。当前声卡仍未接入；视频节点与 wlan0 已由后续适配提供，devices_deferred 为空；这只证明已声明设备没有挂起 probe，不代表缺失功能已完成。设备无基带和摄像头，产品继续 no-telephony/no-camera。
+7. **外围功能接入**。蓝牙 HCI、扫描、配对、AAC 耳机播放及电量已在 #199 接通，见文末；物理音频仍未实现（Wi-Fi STA 已在 #191 接入，见文末）（当前音频为模拟输入/忽略输出）；原厂红外功能/特殊键应用动作、AW9106 LED 未接入。当前声卡仍未接入；视频节点与 wlan0 已由后续适配提供，devices_deferred 为空；这只证明已声明设备没有挂起 probe，不代表缺失功能已完成。设备无基带和摄像头，产品继续 no-telephony/no-camera。
 
 本次核对证据：out/a1260-runtime-pm/soc-audit-before-normal-adb.txt，及当前 DTS、cpuidle-mt6580.c、mt6580-pmic-wrap.c、pinctrl-mt6580.c、clk-mt6580-*.c。CPU 四核、604.5–1300 MHz 调频、GPU/DISP 电源域、eMMC、PMIC 关机和自动 deep 已有实机记录；不因上述清单重新宣称整颗 SoC 已全部完成。
 
@@ -308,3 +308,13 @@ Wi-Fi `+0x6e`、BT `+0x68`，原厂 LK 确认序列号 `+0x74`、最多19个 ASC
 netdev错误/taint0，软件PNO两开关仍true；未增加过滤/PNO/随机化等能力声明。
 随后正常重启自动联网、当前/工厂MAC一致，保存网络未变；普通shell ADB与正常CPU/电源设置保留，
 产品vendor镜像已更新，kernel/boot仍为#197。
+
+## 蓝牙接入（#199，2026-10-28）
+
+已接通内核独占 /dev/stpbt 和源码 AIDL HCI V1 HAL，沿用共享 WMT/STP、原厂五条 consys 初始化命令和同机 BT_Addr RF 参数；不加载旧 Android 8.1 蓝牙库。地址由早期 init 只读 proinfo+0x68 交接，工厂分区和 Wi-Fi 校准未写入。缺少有效原厂地址/校准即初始化失败，不填假数据。
+
+经典扫描、LE 扫描、手机 SSP 配对、耳机 AAC 44.1kHz 立体声真实播放及用户听音通过。HFP 控制通道补齐后耳机上报电量，设置显示50%；boot 默认启用 A2DP/AVRCP/HFP/BAS，正常重启保存两条配对并自动连接耳机。BT 单独关闭不破坏 Wi-Fi，两者关闭后 CONN 断电；只开 BT 冷启动再开 Wi-Fi、5次网关 ping 与 HTTPS200 通过，网络错误/内核 taint 为0。
+
+固件真实版本限定三个适配：0C5A probe 实际 UNKNOWN 后仅清错误能力位；LE encryption-only 位图及真实 legacy mask 成功后限制 LE event mask；0811 失败返回错误的事件类型时仅转换包络，保留实际0x1a错误/credits/handle，不伪造成功、不禁用真实 SSR 能力。此前两类包络导致的栈断言保留为失败证据；修复后音频空闲及电源切换未增加崩溃，最终正常启动观察期0次崩溃。
+
+尚需：蓝牙真实系统待机/远端唤醒、长时播放、HFP SCO/麦克风、HID；CONN SPM guard 继续保留，不能把 radio-on retained standby 算作完整联网深睡。原厂校准只在私有 vendor/aic/a1260-bluetooth，不入 git。详情见 bluetooth/README.md 与内核 mt6580-bluetooth.rst。

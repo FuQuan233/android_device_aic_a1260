@@ -89,6 +89,13 @@ a 270000-byte read/SHA256 check. The full system image mounts successfully.
 
 ## Hardware status
 
+Bluetooth is now connected through the source-built MT6580 AIDL HCI service
+and the shared WMT/STP kernel transport (#199). Classic/LE discovery, phone
+pairing, AAC stereo headphone playback, automatic reconnect and headphone
+battery display pass on hardware. See [bluetooth/README.md](bluetooth/README.md)
+for same-unit calibration preparation, firmware compatibility and remaining
+audio/suspend qualifications.
+
 The kernel has tested USB CDC, eMMC and 480x800 JD9161 DRM scanout. The Android graphics stack uses drm_hwcomposer, minigbm KMS buffers and
 the original Mali r8p0 GLES2 stack described below. Physical boot animation,
 desktop, Settings and GPU drawing/readback are verified.

@@ -1,0 +1,10 @@
+# Early vendor init owns the factory-address handover; the HAL reads a
+# dedicated file and has no access to the factory block device.
+type mt6580_bt_identity_file, file_type, data_file_type;
+allow vendor_init mt6580_bt_identity_file:dir create_dir_perms;
+allow vendor_init mt6580_bt_identity_file:file create_file_perms;
+allow hal_bluetooth_default mt6580_bt_identity_file:dir search;
+allow hal_bluetooth_default mt6580_bt_identity_file:file r_file_perms;
+allow hal_bluetooth_default bt_device:chr_file getattr;
+allow hal_bluetooth_default vendor_configs_file:file r_file_perms;
+allow hal_bluetooth_default sysfs:file r_file_perms;

@@ -1,0 +1,11 @@
+on init
+    setprop bluetooth.profile.a2dp.source.enabled true
+    setprop bluetooth.profile.avrcp.target.enabled true
+    setprop bluetooth.profile.hfp.ag.enabled true
+    setprop bluetooth.profile.bas.client.enabled true
+
+service vendor.bluetooth-mt6580 /vendor/bin/hw/android.hardware.bluetooth-service.mt6580
+    class hal
+    user bluetooth
+    group bluetooth
+    interface aidl android.hardware.bluetooth.IBluetoothHci/default

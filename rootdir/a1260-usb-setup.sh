@@ -16,9 +16,9 @@ echo 'A1260 Android 17 bring-up' > "$G/strings/0x409/product"
 # Keep binary MAC bytes and padding out of Android/USB identity strings.
 a1260_proinfo=/dev/block/by-name/proinfo
 # The factory nvdata backup identifies proinfo+0x6e as WIFI (record+4),
-# and +0x68 as BT_Addr (record+0). Read only the six Wi-Fi address bytes.
-a1260_read_factory_wifi_mac() {
-    a1260_mac_hex=$(od -An -v -tx1 -j 110 -N 6 "$a1260_proinfo") || return 1
+# and +0x68 as BT_Addr (record+0). Read each six-byte address without writing proinfo.
+a1260_read_factory_mac() {
+    a1260_mac_hex=$(od -An -v -tx1 -j "$1" -N 6 "$a1260_proinfo") || return 1
     set -- $a1260_mac_hex
     [ "$#" -eq 6 ] || return 1
     [ "$((0x$1 & 1))" -eq 0 ] || return 1
@@ -26,12 +26,22 @@ a1260_read_factory_wifi_mac() {
     [ "$a1260_mac" != 00:00:00:00:00:00 ] || return 1
     printf '%s' "$a1260_mac"
 }
-if a1260_mac=$(a1260_read_factory_wifi_mac); then
+if a1260_mac=$(a1260_read_factory_mac 110); then
     if ! printf '%s\n' "$a1260_mac" > /sys/devices/platform/180f0000.wifi/factory_mac_address; then
         echo 'A1260 identity: failed to provision factory Wi-Fi MAC' > /dev/kmsg
     fi
 else
     echo 'A1260 identity: no valid factory Wi-Fi MAC in proinfo' > /dev/kmsg
+fi
+if a1260_bt_mac=$(a1260_read_factory_mac 104); then
+    printf '%s\n' "$a1260_bt_mac" > /data/vendor/bluetooth/factory-address.new
+    chown 0:1002 /data/vendor/bluetooth/factory-address.new
+    chmod 640 /data/vendor/bluetooth/factory-address.new
+    mv /data/vendor/bluetooth/factory-address.new /data/vendor/bluetooth/factory-address
+    restorecon /data/vendor/bluetooth/factory-address
+else
+    rm -f /data/vendor/bluetooth/factory-address
+    echo 'A1260 identity: no valid factory Bluetooth address in proinfo' > /dev/kmsg
 fi
 a1260_read_factory_serial() {
     a1260_serial_hex=$(od -An -v -tx1 -j 116 -N 19 "$a1260_proinfo") || return 1

@@ -1,5 +1,7 @@
 LOCAL_PATH := device/aic/a1260
 PRODUCT_SOURCE_ROOT_DIRS += -kernel/aic/mt6580
+
+$(call inherit-product, device/aic/a1260/bluetooth/bluetooth.mk)
 TARGET_SUPPORTS_32_BIT_APPS := true
 TARGET_SUPPORTS_64_BIT_APPS := false
 PRODUCT_USE_DYNAMIC_PARTITIONS := false

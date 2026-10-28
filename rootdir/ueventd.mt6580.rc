@@ -18,3 +18,4 @@
 # WMT owns the shared CONSYS transport; Wi-Fi HAL only toggles its function.
 /dev/stpwmt                 0660 system system
 /dev/wmtWifi                0660 wifi wifi
+/dev/stpbt                  0660 bluetooth bluetooth
