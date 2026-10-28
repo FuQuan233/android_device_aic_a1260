@@ -46,10 +46,31 @@ NetworkMonitor 已判定成功。NTP 使用经用户确认的 `time.apple.com`�
 启动时的一次性 `network-defaults.sh` 也为已有 bring-up 镜像设置尚未指定的默认值，保留后续用户修改。
 当前镜像通过正常网络探测，不伪造已验证状态或绕过 TLS。
 
-完整 BTIF CCF 停钟、连接状态下更深的系统休眠、长时间吞吐及 MAC 持久化仍待独立资格化。
+连接状态下更深的系统休眠、长时间吞吐及 MAC 持久化仍待独立资格化。
 当前 Wi-Fi 开启时 SPM 保留 CONN 所需资源；关闭后释放。SELinux 仍沿用设备整体 permissive 策略，
 新增规则已通过 neverallow 检查，不代表其他硬件策略已完成。
 
 最终 #192 冷启动再次自动连接已保存热点，框架识别为 802.11n/65Mbps，
 MIUI探测及Apple自动校时再次成功；默认普通shell ADB、四核schedutil/604500–1300000、deep和stay-on0保留。
 标准产品 boot.img/kernel/vendor.img 已同步本轮实现。
+
+## BTIF 空闲停钟（#193）
+
+按旧 BSP 的 TX 排空→关 BTIF CCF 时钟、恢复时钟→请求固件唤醒顺序实现，
+没有用 SLEEP_EN 位代替真实门控。IRQ 同步后才停钟；未读 RX 或尚未结束的 STP 解析会保留时钟，
+关闭、调试和发送路径统一保护，避免访问已停钟寄存器。只读 `btif_state` 提供缓存状态与统计，
+读取本身不唤醒 BTIF；物理门控由 CCF 和 TOPCG_CTRL1 bit12 独立核对。
+
+实机已连接时 prepare/enable=0/0、硬件门控 N，TOPCG_CTRL1 bit12 为 1；
+保持停钟状态下网关/外网 ping 各5次零丢包，HTTPS200。关闭 Wi-Fi 时先恢复 BTIF 并完成真实固件唤醒，
+随后 CONN/LDO 释放；再次开启关联/DHCP 后重新停钟。RX 软件溢出/硬件 overrun、停钟超时和 MPU 违例均为0。
+初次联网探针早于开机 DHCP，当时无路由；保留失败原始记录，不计入通过样本。
+
+另发现熄屏且断网时框架仍请求尚未支持的硬件 PNO，导致重试；亮屏后普通扫描和重连正常。
+软件 PNO/熄屏重连需后续接入，不为绕过该问题声明虚假固件能力。
+
+实际拔线/熄屏/插回后网络重新验证成功，网关5包零丢包，但系统挂起未通过：success=0/fail=3，
+其中两次设备挂起阶段被 `WLAN TX THREAD` 取消。当前不广告未验证的 WoWLAN，cfg80211 因此在挂起时
+主动断开，断开 OID 又触发 TX 线程唤醒锁；旧 AHB platform suspend/resume 回调本身为空。
+下一步需完成 cfg80211/WoWLAN、固件挂起/所有权和唤醒 IRQ 的真实配合；本轮不记为“保持连接深睡通过”。
+恢复后 BTIF 仍停钟，溢出/超时/MPU违例和 taint 均为0。记录见 `out/a1260-runtime-pm/wifi-power/`。

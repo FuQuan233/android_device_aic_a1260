@@ -240,7 +240,8 @@ PIO 禁 PDMA 不能同时丢掉 HifPdmaInit 中原本附带的独立 MPU 配置�
 Android AIDL/nl80211/wificond/supplicant 已提供设置界面，用户完成 WPA2 连接，DHCP/DNS/外网与 HTTPS200通过。
 稳定 ping 网关/外网各5次零丢包、收发错误0，冷启动 MPU 违例0；空闲后关闭确认 CONN/LDO断电，再开启成功。
 Google探测失败会被系统标成无互联网并阻止自动重连，单列为网络验证策略，未伪造已验证能力。
-后续：BTIF真实CCF停钟/有连接深睡、持续吞吐、缺省本地MAC持久化及高级能力。详见 wifi/README.md。
+后续：有连接深睡、熄屏断网后的软件扫描重连、持续吞吐、缺省本地MAC持久化及高级能力。
+BTIF真实CCF停钟进展见下节及 wifi/README.md。
 
 **联网探测/校时补充（用户指定）**：MIUI `connect.rom.miui.com/generate_204` 的HTTP与HTTPS均实机204，
 NetworkMonitor成功，替代当前网络不可达的Google HTTPS探测。用户确认将无法解析的ntp.apple.com改为time.apple.com，
@@ -253,3 +254,15 @@ Apple SNTP成功，lastSuccessfulUri=ntp://time.apple.com，真实时间结果�
 **最终标准镜像 #192**：清理未实现PMF的AES-CMAC广播后冷启动再次自动关联/DHCP，框架显示802.11n/65Mbps，
 MIUI验证成功；Apple SNTP由正常network-available流程自动成功，非仅手动刷新。默认shell ADB、四核schedutil、
 604500..1300000、deep/stay-on0保留，标准boot/kernel/vendor已同步。
+
+**BTIF 真实停钟 #193**：按旧 BSP 在真实固件睡眠确认后排空 TX，再同步关 IRQ/CCF；
+RX/解析工作未结束则保留时钟。恢复时先开 CCF、恢复 IRQ 再请求真实固件唤醒，关闭和调试路径避免停钟 MMIO。
+实机空闲 prepare/enable=0/0、硬件 N、TOPCG_CTRL1 bit12=1；保持门控时网关/外网各5包零丢包、HTTPS200。
+关 Wi-Fi 计数确认一次恢复/真实唤醒并释放 CONN/LDO，再开启关联/DHCP 后第二次停钟；
+RX overflow/overrun、停钟超时、MPU违例0。初次过早探针无 DHCP 路由，已保留失败记录，未计为联网通过。
+另定位熄屏断网时框架重试不支持的硬件 PNO；亮屏扫描正常，软件 PNO 配置/资格化单列后续工作。
+
+**实际拔插待机未通过**：重新亮屏后网络恢复 VALIDATED、网关5包零丢包，BTIF仍门控且错误/taint0；
+但挂起 success=0/fail=3，其中两次设备阶段被 WLAN TX THREAD 取消，SPM未实际进入保留/深睡。
+cfg80211在未配置WoWLAN时主动断开，断开OID触发TX唤醒锁；旧AHB平台PM回调为空。
+下一步优先接真实cfg80211/WoWLAN、固件挂起/所有权及IRQ唤醒，再处理软件PNO，保持CONN的DDR保护不变。
