@@ -141,3 +141,24 @@ IRQ wake已配平解除，BTIF仍停钟、MPU违例和taint为0。ANY会因正�
 无效 MAC 写入返回 EINVAL，运行后换地址返回 EBUSY，重复同值允许。
 原厂分区与已安装 RF 校准 SHA256 未变。主机 ADB 原始字节与 USB iSerial 均为原厂16个可打印字符；
 此前用户遇到的不可见字符未在修复前独立复现，不推断它必然由 EP0 包边界引起。
+
+## Android 当前 MAC 查询
+
+AIDL supplicant 的 `getMacAddress()` 走文本 `MACADDR` 驱动命令；
+通用 stub 未提供此命令，导致内核已使用原厂地址而 Android `WifiInfo` 仍是 `MAC: <none>`。
+BoardConfig 选择设备内的 `lib_driver_cmd_mt6580`，通过标准 `SIOCGIFHWADDR`
+读取当前接口并返回 supplicant 要求的文本格式。没有向固件发送未经确认的私有命令，
+也没有把 proinfo 值直接冒充当前接口值。未实现的命令与 P2P 操作明确返回不支持。
+
+本机早期 bring-up 还在 Wi-Fi config store 中缓存了旧随机工厂地址。
+停用框架后只删除该缓存 XML 元素，其他字节保留，再由标准 HAL 的 `ETHTOOL_GPERMADDR`
+路径重新读取并保存真实地址；未重置网络、密码或用户偏好，未添加周期性数据改写脚本。
+备份仅保存在本地私有输出目录，不进入仓库。
+
+新 supplicant 与内核 #197 实测：`wpa_cli driver MACADDR`、Android `WifiInfo`、
+工厂缓存和实际 netdev 地址一致；未知命令返回 FAIL。熄屏全程关开无线后自动关联/DHCP，
+原有保存网络列表与软件 PNO 两个开关保持不变；初次启动及关开各网关5包零丢包、
+HTTPS200、netdev 错误/内核 taint 为0。此项不代表已实现选择性过滤或完整联网深睡。
+随后正常重启无需手动开启无线即自动连接，Android 当前地址与持久化工厂地址仍一致，
+保存网络列表未变；普通 shell ADB、四核 schedutil/604500..1300000、默认 deep/stay-on0 保留。
+产品 vendor.img 已同步新 supplicant，内核与 boot.img 仍为已验证的 #197。

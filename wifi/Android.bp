@@ -8,3 +8,12 @@ cc_library_shared {
     shared_libs: ["liblog"],
     cflags: ["-Wall", "-Wextra", "-Werror"],
 }
+
+cc_library_static {
+    name: "lib_driver_cmd_mt6580",
+    vendor: true,
+    srcs: ["driver_cmd.c"],
+    header_libs: ["wpa_supplicant_headers"],
+    shared_libs: ["libnl"],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter"],
+}

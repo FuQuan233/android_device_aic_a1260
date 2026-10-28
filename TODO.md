@@ -300,3 +300,11 @@ Wi-Fi `+0x6e`、BT `+0x68`，原厂 LK 确认序列号 `+0x74`、最多19个 ASC
 无效/晚改地址被拒绝；proinfo/RF 校验未变。ADB/USB 当前序列号可打印且一致。
 因此此前“缺省MAC持久化”项关闭。原厂 BT 字段已识别，蓝牙功能仍未接入；
 完整联网深睡、选择性唤醒/长时功耗和持续吞吐仍保留待办，USB 大传输继续按用户要求暂缓。
+
+**Android MAC 查询补齐（#197 + 新 supplicant）**：设备静态命令库替换空 stub，
+仅以标准 ioctl 实现 MACADDR，未知命令/P2P 返回不支持。Android WifiInfo 不再显示 MAC none。
+本机只移除一次旧随机工厂 MAC 缓存条目，其他配置字节保留，由标准 HAL 重读并持久化；
+保存网络列表不变。熄屏全程正常关开、关联/DHCP与原厂地址一致，初次与关开后各网关5包/HTTPS200，
+netdev错误/taint0，软件PNO两开关仍true；未增加过滤/PNO/随机化等能力声明。
+随后正常重启自动联网、当前/工厂MAC一致，保存网络未变；普通shell ADB与正常CPU/电源设置保留，
+产品vendor镜像已更新，kernel/boot仍为#197。
