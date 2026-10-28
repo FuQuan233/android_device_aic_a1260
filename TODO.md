@@ -277,3 +277,18 @@ SPM state3/cpu0_mode0/fallback1/r0=4，CONN保护保留DDR/infra/MAINPLL。
 此项取代上节#193的联网挂起阻塞；完整联网深睡、选择性唤醒、软件PNO/熄屏断网重连、持续吞吐、MAC持久化仍待完成。
 补关开回归：CONN/LDO释放、自动重连和新wiphy的ANY恢复、网关3包零丢包，错误/taint0。
 标准boot/kernel/vendor更新#194；记录/临时文件清理，普通shell ADB、四核schedutil/604500..1300000、deep/stay-on0保留。
+
+**软件PNO/熄屏重连接入（#194 + Wi-Fi vendor RRO，2026-10-28）**：
+新增A1260WifiOverlay，只打开WifiCustomization允许的config_wifiSwPnoEnabled；
+一次性shell初始化在DeviceConfig wifi/software_pno_enabled未配置时设true，保留显式覆盖。
+两个开关均需启用；继续如实声明不支持固件PNO，不修改APEX，也不新增守护轮询或永久锁。
+保留系统移动/静止与快慢扫描退避。重启后RRO自动启用、两个值均true；
+全程Asleep正常关开Wi-Fi，明确进入Software PNO并安排20000ms下一扫，真实单扫完成自动关联/DHCP。
+网关5包零丢包/HTTPS200/netdev错误及taint0。该初轮USB在线；热点消失和真实待机定时重扫另记。
+
+**软件PNO跨真实待机通过**：物理拔USB/关热点约30秒/开热点等待/插回；
+临时排除其他保存网络，按原值恢复，不删除用户网络。明确捕获20000ms、40000ms退避及AlarmManager两次SW_PNO唤醒，
+USB断开、wakefulness=Asleep时已回到同一测试网络；连接后300000ms后续闹钟被正常取消。
+系统保留待机成功6次，alarmtimer临近到期-EBUSY取消2次，cfg80211回调8/8且wake解除/错误0。
+恢复后VALIDATED、网关5包零丢包、HTTPS200，netdev/MPU/taint0，脚本COMPLETE/EXIT_STATUS0。
+因此软件PNO/熄屏断网重连已通过；后续仍为完整联网深睡、选择性唤醒/长时功耗、持续吞吐及缺省MAC持久化。

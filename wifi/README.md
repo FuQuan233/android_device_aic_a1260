@@ -2,7 +2,7 @@
 
 Linux 6.18 使用 MT6580 片内 AHB Gen2 驱动，WMT/STP 通过 BTIF 启动连接 MCU。
 Android 使用源码 AIDL Wi-Fi 服务、本站点 nl80211 HAL、wificond 和现代 wpa_supplicant。
-当前仅支持 2.4GHz STA；不声明 AP/P2P、WPA3/PMF、PNO、RTT 或高级统计能力。
+当前仅支持 2.4GHz STA；不声明 AP/P2P、WPA3/PMF、固件 PNO、RTT 或高级统计能力。
 
 原厂镜像与本机 RF 校准不放进 Git。在 Android 源码根目录运行：
 
@@ -67,7 +67,7 @@ MIUI探测及Apple自动校时再次成功；默认普通shell ADB、四核sched
 初次联网探针早于开机 DHCP，当时无路由；保留失败原始记录，不计入通过样本。
 
 另发现熄屏且断网时框架仍请求尚未支持的硬件 PNO，导致重试；亮屏后普通扫描和重连正常。
-软件 PNO/熄屏重连需后续接入，不为绕过该问题声明虚假固件能力。
+该 #193 阶段软件 PNO/熄屏重连尚未接入；后续结果见下节，未为绕过问题声明虚假固件能力。
 
 实际拔线/熄屏/插回后网络重新验证成功，网关5包零丢包，但系统挂起未通过：success=0/fail=3，
 其中两次设备挂起阶段被 `WLAN TX THREAD` 取消。当前不广告未验证的 WoWLAN，cfg80211 因此在挂起时
@@ -94,3 +94,29 @@ IRQ wake已配平解除，BTIF仍停钟、MPU违例和taint为0。ANY会因正�
 随后关开Wi-Fi，CONN/LDO释放、保存网络重连及新wiphy的ANY配置恢复，网关3包零丢包、错误0。
 诊断须按netdev的phy80211链接查当前wiphy，不能在开关后继续硬编码phy0。
 标准boot/kernel/vendor已同步#194，测试脚本清理并恢复普通shell ADB。
+
+## 熄屏断网后的软件扫描回退
+
+`A1260WifiOverlay` 是 vendor 静态 RRO，仅覆盖 Wi-Fi 模块明确允许设备定制的
+`config_wifiSwPnoEnabled`。一次性 `network-defaults.sh` 在
+`wifi/software_pno_enabled` 尚未配置时设为true，保留显式的后续自定义值。
+这两个开关缺一不可；资源覆盖不修改 Wi-Fi APEX，也不把普通扫描声明为固件 PNO。
+
+硬件 PNO 不可用时，系统 `WifiScanningService` 使用其现有 `SwPnoScanState`，
+通过真实单次扫描寻找保存网络。沿用系统原有移动/静止、快速、慢速退避参数，
+没有添加轮询守护进程、永久唤醒锁或高频重扫周期；连接建立或请求结束时由系统取消扫描闹钟。
+内核继续使用已验证的 #194，WoWLAN ANY 和 CONN/DDR 保留策略保持一致。
+
+初轮实机验证（2026-10-28）：普通重启后 vendor RRO 自动启用，资源查询与 DeviceConfig 均为true；
+未修改 Wi-Fi APEX 或默认 ADB 权限。设备全程 `mWakefulness=Asleep`，正常关开 Wi-Fi 后框架日志
+明确进入 `Starting Software PNO`，按原参数安排下一次20000ms扫描，随即通过真实扫描找到保存网络，
+自动关联/DHCP成功；网关5包零丢包、HTTPS200、收发错误/MPU/taint0。
+该轮USB保持连接，只证明熄屏重连；定时重扫跨真实待机另行记录。
+
+后续物理拔线/热点关闭再开启/插回通过：其他保存网络的自动连接临时关闭，避免切回另一热点；
+完成后按原值恢复。热点丢失后软件PNO先后安排20000ms、40000ms重扫，AlarmManager确实记录2次
+软件PNO唤醒；在USB仍断开且wakefulness=Asleep时已连接回同一测试网络。
+连接后尚待执行的300000ms重扫被系统取消，记录中的相关闹钟只剩取消历史与统计。
+实际完成6次保留待机，另2次被临近的alarmtimer以-EBUSY取消；cfg80211挂起/恢复8/8、IRQ wake解除、错误0。
+插回后网络VALIDATED、网关5包零丢包、HTTPS200，收发错误/MPU/taint0；脚本COMPLETE/EXIT_STATUS0。
+这补齐了熄屏断网及跨待机的定时重扫，不等于已完成联网DDR/infra/MAINPLL关闭或长期功耗标定。

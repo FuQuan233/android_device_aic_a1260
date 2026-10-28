@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<resources>
+    <!-- Gen2 AHB has ordinary scans, not scheduled firmware scan offload.
+         Keep Android's standard mobility/fast/slow backoff intervals. -->
+    <bool name="config_wifiSwPnoEnabled">true</bool>
+</resources>

@@ -3,6 +3,7 @@
 $(call inherit-product-if-exists, vendor/aic/a1260-wifi/wifi-vendor.mk)
 
 PRODUCT_PACKAGES += \
+    A1260WifiOverlay \
     android.hardware.wifi-service \
     libwifi-hal-mt6580 \
     mt6580-wmt-dispatcher \

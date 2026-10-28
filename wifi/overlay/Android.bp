@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+runtime_resource_overlay {
+    name: "A1260WifiOverlay",
+    vendor: true,
+    sdk_version: "current",
+    resource_dirs: ["res"],
+}
